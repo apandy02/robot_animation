@@ -1,31 +1,21 @@
-# KUKA LBR iiwa 14 Description (MJCF)
+# Robot Animation
 
-Requires MuJoCo 2.3.3 or later.
+This repository contains the code for the Heartificial Implementation of Expressive Robot behavior transfer from animation to simulation.
 
-## Overview
+## Getting Started
 
-This package contains a simplified robot description (MJCF) of the [LBR iiwa](https://www.kuka.com/en-us/products/robotics-systems/industrial-robots/lbr-iiwa) 14kg developed
-by [KUKA Robotics](https://www.kuka.com/en-us). It is derived from the [publicly available](https://github.com/RobotLocomotion/drake/blob/master/manipulation/models/iiwa_description/urdf/iiwa14_spheres_dense_collision.urdf)
-URDF description created by the [Drake](https://github.com/RobotLocomotion/drake) developers.
+### Setup
 
-<p float="left">
-  <img src="iiwa_14.png" width="400">
-</p>
+1. Install UV by following instructions [here](https://docs.astral.sh/uv/getting-started/installation/)
 
-## URDF → MJCF derivation steps
+2. Clone the repository:
+   ```bash
+   git clone git@github.com:apandy02/robot_animation.git
+   cd robot_animation
+   ```
 
-1. Added `<mujoco> <compiler discardvisual="false"/> </mujoco>` to the
-   [URDF](https://github.com/RobotLocomotion/drake/blob/master/manipulation/models/iiwa_description/urdf/iiwa14_spheres_dense_collision.urdf)'s
-   `<robot>` clause in order to preserve visual geometries.
-2. Loaded the URDF into MuJoCo and saved a corresponding MJCF.
-3. Created base body and added its corresponding inertial properties.
-4. Added a tracking light to the base.
-5. Manually edited the MJCF to extract common properties into the `<default>` section.
-6.  Added `<exclude>` clauses to prevent collisions between `base` and `link1`.
-7.  Added actuators for the arm.
-8.  Added forcelimits to match the torque limits in the [spec sheet](https://www.reeco.co.uk/wp-content/uploads/2020/05/KUKA-LBR-iiwa-technical-data.pdf).
-9.  Added `scene.xml` which includes the robot, with a textured groundplane, skybox, and haze.
-
-## License
-
-This model is released under a [BSD-3-Clause License](LICENSE).
+3. Create virtual environment and sync dependencies:
+   ```bash
+   uv venv
+   uv sync
+   ```
