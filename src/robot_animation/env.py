@@ -1,12 +1,12 @@
 from gymnasium.envs.mujoco import MujocoEnv
 from gymnasium.spaces import Box
 import numpy as np
-
+from gymnasium import utils
 DEFAULT_CAMERA_CONFIG = {
     "distance": 4.0,
 }
 
-class RobotAnimationEnv(MujocoEnv):
+class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
     """
     Our environment definition for transferring robot behavior 
     from animation to simulation using RL. 
@@ -14,6 +14,7 @@ class RobotAnimationEnv(MujocoEnv):
     metadata = {
         "render_fps": 20,
     }
+    max_timesteps = 10
     def __init__(
             self,
             model_path: str,
@@ -21,7 +22,12 @@ class RobotAnimationEnv(MujocoEnv):
             **kwargs,
         ):
         observation_space = Box(low=-np.inf, high=np.inf, shape=(17,), dtype=np.float64)
-        super().__init__(
+        self.time = 0 # note, we also have data.time
+        
+        utils.EzPickle.__init__(self)
+        
+        MujocoEnv.__init__(
+            self, 
             model_path, 
             frame_skip,
             observation_space=observation_space,
@@ -45,7 +51,8 @@ class RobotAnimationEnv(MujocoEnv):
         observation = self._get_obs()
         self.do_simulation(action, self.frame_skip)
         reward = 0
-        terminated = False
+        self.time += 1
+        terminated = self.timestep >= self.max_timesteps
         info = {}
         return observation, reward, terminated, False, info
     

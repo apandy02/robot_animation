@@ -20,8 +20,4 @@ Algorithm related:
 - value network (critic)
     - L2 Reg 
 - minibatch updates (of each network)
-
-
-
-
 """
