@@ -9,5 +9,6 @@ dependencies = [
     "ipykernel>=6.29.5",
     "mediapy>=1.2.2",
     "mujoco>=3.2.7",
+    "pandas>=2.2.3",
     "robot-descriptions>=1.14.0",
 ]
