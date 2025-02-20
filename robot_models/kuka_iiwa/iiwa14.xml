@@ -6,18 +6,18 @@
   <default>
     <default class="iiwa">
       <material specular="0.5" shininess="0.25"/>
-      <joint axis="0 0 1"/>
+      <joint axis="0 0 1" damping="0.1"/> <!-- Added damping attribute -->
       <general gaintype="fixed" biastype="affine" gainprm="2000" biasprm="0 -2000 -200"/>
       <default class="joint1">
-        <joint range="-2.96706 2.96706"/>
+        <joint range="-2.96706 2.96706" damping="0.1"/> <!-- Added damping attribute -->
         <general ctrlrange="-2.96706 2.96706"/>
         <default class="joint2">
-          <joint range="-2.0944 2.0944"/>
+          <joint range="-2.0944 2.0944" damping="0.1"/> <!-- Added damping attribute -->
           <general ctrlrange="-2.0944 2.0944"/>
         </default>
       </default>
       <default class="joint3">
-        <joint range="-3.05433 3.05433"/>
+        <joint range="-3.05433 3.05433" damping="0.1"/> <!-- Added damping attribute -->
         <general ctrlrange="-3.05433 3.05433"/>
       </default>
       <default class="visual">
@@ -29,6 +29,7 @@
       <site size="0.001" rgba="1 0 0 1" group="4"/>
     </default>
   </default>
+
 
   <asset>
     <material class="iiwa" name="gray" rgba="0.4 0.4 0.4 1"/>
@@ -159,13 +160,13 @@
   </contact>
 
   <actuator>
-    <general name="actuator1" joint="joint1" class="joint1"/>
-    <general name="actuator2" joint="joint2" class="joint2"/>
-    <general name="actuator3" joint="joint3" class="joint1"/>
-    <general name="actuator4" joint="joint4" class="joint2"/>
-    <general name="actuator5" joint="joint5" class="joint1"/>
-    <general name="actuator6" joint="joint6" class="joint2"/>
-    <general name="actuator7" joint="joint7" class="joint3"/>
+    <position name="actuator1" joint="joint1" kp="100"/>
+    <position name="actuator2" joint="joint2" kp="100"/>
+    <position name="actuator3" joint="joint3" kp="100"/>
+    <position name="actuator4" joint="joint4" kp="100"/>
+    <position name="actuator5" joint="joint5" kp="100"/>
+    <position name="actuator6" joint="joint6" kp="100"/>
+    <position name="actuator7" joint="joint7" kp="100"/>
   </actuator>
 
   <keyframe>
