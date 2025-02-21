@@ -9,25 +9,27 @@ DEFAULT_CAMERA_CONFIG = {
 
 class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
     """
-    Our environment definition for transferring robot behavior 
+    Custom environment definition for transferring robot behavior 
     from animation to simulation using RL. 
     """
     metadata = {
         "render_fps": 30,
+        "render_modes": ["human"],
     }
-    max_timesteps = 10
     def __init__(
             self,
             model_path: str,
             frame_skip: int,
             target_qpos: np.ndarray,
             target_qvel: np.ndarray,
+            num_links: int,
             **kwargs,
         ):
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(17,), dtype=np.float64)
+        # observation space is the position and velocity of the links
+        observation_space = Box(low=-np.inf, high=np.inf, shape=(num_links * 2,), dtype=np.float64)
+        self.target_qpos, self.target_qvel = target_qpos, target_qvel
+        self.max_frames = len(target_qpos)
         self.frame_number = 1
-        self.target_qpos = target_qpos
-        self.target_qvel = target_qvel
         
         utils.EzPickle.__init__(self)
         
@@ -57,7 +59,7 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         self.do_simulation(action, self.frame_skip)
         reward = self._imitation_reward()
         self.frame_number += 1
-        terminated = self.frame_number >= self.max_timesteps
+        terminated = self.frame_number >= self.max_frames
         
         if terminated:
             self.frame_number = 1
