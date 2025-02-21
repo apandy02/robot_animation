@@ -13,17 +13,21 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
     from animation to simulation using RL. 
     """
     metadata = {
-        "render_fps": 20,
+        "render_fps": 30,
     }
     max_timesteps = 10
     def __init__(
             self,
             model_path: str,
             frame_skip: int,
+            target_qpos: np.ndarray,
+            target_qvel: np.ndarray,
             **kwargs,
         ):
         observation_space = Box(low=-np.inf, high=np.inf, shape=(17,), dtype=np.float64)
-        self.time = 0 # note, we also have data.time
+        self.frame_number = 1
+        self.target_qpos = target_qpos
+        self.target_qvel = target_qvel
         
         utils.EzPickle.__init__(self)
         
@@ -51,9 +55,13 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         """
         observation = self._get_obs()
         self.do_simulation(action, self.frame_skip)
-        reward = 0
-        self.time += 1
-        terminated = self.timestep >= self.max_timesteps
+        reward = self._imitation_reward()
+        self.frame_number += 1
+        terminated = self.frame_number >= self.max_timesteps
+        
+        if terminated:
+            self.frame_number = 1
+        
         info = {}
         return observation, reward, terminated, False, info
     
@@ -63,3 +71,8 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
 
         observation = np.concatenate((position, velocity)).ravel()
         return observation
+    
+    def _imitation_reward(self):
+        qpos_diff = np.linalg.norm(self.data.qpos - self.target_qpos[self.frame_number], axis=1)
+        qvel_diff = np.linalg.norm(self.data.qvel - self.target_qvel[self.frame_number], axis=1)
+        return -np.sum(qpos_diff) - np.sum(qvel_diff)
