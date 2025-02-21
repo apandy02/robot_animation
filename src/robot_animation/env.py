@@ -13,34 +13,39 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
     from animation to simulation using RL. 
     """
     metadata = {
-        "render_fps": 30,
         "render_modes": ["human"],
     }
     def __init__(
             self,
             model_path: str,
-            frame_skip: int,
+            animation_frame_rate: int,
             target_qpos: np.ndarray,
             target_qvel: np.ndarray,
             num_links: int,
             **kwargs,
         ):
         # observation space is the position and velocity of the links
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(num_links * 2,), dtype=np.float64)
+        self.metadata["render_fps"] = animation_frame_rate
         self.target_qpos, self.target_qvel = target_qpos, target_qvel
         self.max_frames = len(target_qpos)
         self.frame_number = 1
+
+        observation_space = Box(low=-np.inf, high=np.inf, shape=(num_links * 2,), dtype=np.float64)
         
         utils.EzPickle.__init__(self)
         
+        dummy_frame_skip = 1
+
         MujocoEnv.__init__(
             self, 
             model_path, 
-            frame_skip,
+            dummy_frame_skip,
             observation_space=observation_space,
             default_camera_config=DEFAULT_CAMERA_CONFIG,
             **kwargs,
         )
+
+        self.frame_skip = int(1 / (animation_frame_rate * self.model.opt.timestep))
 
     def step(self, action: np.ndarray) -> tuple[np.ndarray, float, bool, bool, dict]:
         """
