@@ -9,36 +9,34 @@ DEFAULT_CAMERA_CONFIG = {
 
 class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
     """
-    Custom environment definition for transferring robot behavior 
-    from animation to simulation using RL. 
+    Custom environment definition for transferring robot behavior from animation to simulation using RL.
     """
     metadata = {
         "render_modes": ["human"],
     }
     def __init__(
-            self,
-            model_path: str,
-            animation_frame_rate: int,
-            target_qpos: np.ndarray,
-            target_qvel: np.ndarray,
-            num_links: int,
-            **kwargs,
-        ):
-        # observation space is the position and velocity of the links
+        self,
+        model_path: str,
+        animation_frame_rate: int,
+        target_qpos: np.ndarray,
+        target_qvel: np.ndarray,
+        num_links: int,
+        **kwargs,
+    ):
         self.metadata["render_fps"] = animation_frame_rate
         self.target_qpos, self.target_qvel = target_qpos, target_qvel
         self.max_frames = len(target_qpos)
         self.frame_number = 1
 
         observation_space = Box(low=-np.inf, high=np.inf, shape=(num_links * 2,), dtype=np.float64)
-        
+
         utils.EzPickle.__init__(self)
-        
+
         dummy_frame_skip = 1
 
         MujocoEnv.__init__(
-            self, 
-            model_path, 
+            self,
+            model_path,
             dummy_frame_skip,
             observation_space=observation_space,
             default_camera_config=DEFAULT_CAMERA_CONFIG,
@@ -60,17 +58,17 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
             reward: The reward from the environment.
             terminated: Whether the episode is terminated.
         """
-        observation = self._get_obs()
+
         self.do_simulation(action, self.frame_skip)
         reward = self._imitation_reward()
         self.frame_number += 1
         terminated = self.frame_number >= self.max_frames
-        
+        new_observation = self._get_obs()
         if terminated:
             self.frame_number = 1
         
         info = {}
-        return observation, reward, terminated, False, info
+        return new_observation, reward, terminated, False, info
     
     def _get_obs(self):
         position = self.data.qpos.flat.copy()
