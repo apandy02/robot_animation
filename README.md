@@ -6,7 +6,16 @@ This repository contains the code for the Heartificial Implementation of Express
 
 ### Setup
 
-1. Install UV by following instructions [here](https://docs.astral.sh/uv/getting-started/installation/)
+1. Install UV
+   
+   with pip:
+   ```bash
+   pip install uv
+   ```
+   or using wget:
+   ```bash
+   wget -qO- https://astral.sh/uv/install.sh | sh
+   ```
 
 2. Clone the repository:
    ```bash
