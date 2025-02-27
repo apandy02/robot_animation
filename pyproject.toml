@@ -6,9 +6,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "gymnasium>=1.0.0",
+    "imageio>=2.37.0",
     "ipykernel>=6.29.5",
     "mediapy>=1.2.2",
     "mujoco>=3.2.7",
     "pandas>=2.2.3",
     "robot-descriptions>=1.14.0",
+    "stable-baselines3[extra]>=2.5.0",
 ]

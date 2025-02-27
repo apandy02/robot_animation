@@ -12,7 +12,7 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
     Custom environment definition for transferring robot behavior from animation to simulation using RL.
     """
     metadata = {
-        "render_modes": ["human"],
+        "render_modes": ["human", "rgb_array", "depth_array"],
     }
     def __init__(
         self,
@@ -20,18 +20,28 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         animation_frame_rate: int,
         target_qpos: np.ndarray,
         target_qvel: np.ndarray,
-        num_links: int,
+        num_q: int,
+        reset_noise_scale: float = 0.1,
         **kwargs,
     ):
-        self.metadata["render_fps"] = animation_frame_rate
+        utils.EzPickle.__init__(
+            self,
+            model_path,
+            animation_frame_rate,
+            target_qpos,
+            target_qvel,
+            num_q,
+            reset_noise_scale,
+            **kwargs
+        )
+        
         self.target_qpos, self.target_qvel = target_qpos, target_qvel
+        self._num_q = num_q
+        self._reset_noise_scale = reset_noise_scale
         self.max_frames = len(target_qpos)
         self.frame_number = 1
 
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(num_links * 2,), dtype=np.float64)
-
-        utils.EzPickle.__init__(self)
-
+        observation_space = Box(low=-np.inf, high=np.inf, shape=(num_q * 2,), dtype=np.float64)
         dummy_frame_skip = 1
 
         MujocoEnv.__init__(
@@ -44,6 +54,14 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         )
 
         self.frame_skip = int(1 / (animation_frame_rate * self.model.opt.timestep))
+    
+    @property
+    def num_q(self):
+        """
+        Get the number of q in the robot.
+        """
+        return self._num_q
+
 
     def step(self, action: np.ndarray) -> tuple[np.ndarray, float, bool, bool, dict]:
         """
@@ -64,11 +82,31 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         self.frame_number += 1
         terminated = self.frame_number >= self.max_frames
         new_observation = self._get_obs()
+        
         if terminated:
+            # TODO: add a termination condition for falling
             self.frame_number = 1
         
         info = {}
         return new_observation, reward, terminated, False, info
+    
+    def reset_model(self):
+        noise_low = -self._reset_noise_scale
+        noise_high = self._reset_noise_scale
+
+        qpos = self.init_qpos + self.np_random.uniform(
+            low=noise_low, high=noise_high, size=self.model.nq
+        )
+        qvel = (
+            self.init_qvel
+            + self._reset_noise_scale * self.np_random.standard_normal(self.model.nv)
+        )
+
+        self.set_state(qpos, qvel)
+
+        observation = self._get_obs()
+        return observation
+
     
     def _get_obs(self):
         position = self.data.qpos.flat.copy()
