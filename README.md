@@ -28,3 +28,20 @@ This repository contains the code for the Heartificial Implementation of Express
    uv venv
    uv sync
    ```
+
+## Running the Project
+
+To train the robot using PPO:
+
+```bash
+uv run src/robot_animation/ppo_training.py
+```
+
+## Linting and Formatting
+
+To run the linter and formatter:
+
+```bash
+uvx isort .
+uvx ruff check . --fix
+```
