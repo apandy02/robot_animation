@@ -5,7 +5,7 @@ import gymnasium as gym
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 
-from robot_animation.env import RobotAnimationEnv  # type: ignore # noqa: F401
+from robot_animation.env import RobotAnimationEnv  # noqa: F401
 
 
 def parse_args():

@@ -62,7 +62,6 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         """
         return self._num_q
 
-
     def step(self, action: np.ndarray) -> tuple[np.ndarray, float, bool, bool, dict]:
         """
         Step function that applies an action to the environment and gathers 
@@ -90,7 +89,13 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         info = {}
         return new_observation, reward, terminated, False, info
     
-    def reset_model(self):
+    def reset_model(self) -> np.ndarray:
+        """
+        Reset robot model to the initial state.
+
+        Returns:
+            observation: the env observation post reset 
+        """
         noise_low = -self._reset_noise_scale
         noise_high = self._reset_noise_scale
 
@@ -103,8 +108,8 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         )
 
         self.set_state(qpos, qvel)
-
         observation = self._get_obs()
+
         return observation
     
     def _set_action_space(self):
