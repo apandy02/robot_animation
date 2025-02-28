@@ -106,7 +106,12 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
 
         observation = self._get_obs()
         return observation
-
+    
+    def _set_action_space(self):
+        bounds = self.model.jnt_range.copy().astype(np.float32)
+        low, high = bounds.T
+        self.action_space = Box(low=low, high=high, dtype=np.float32)
+        return self.action_space
     
     def _get_obs(self):
         position = self.data.qpos.flat.copy()
@@ -116,6 +121,6 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         return observation
     
     def _imitation_reward(self):
-        qpos_diff = np.linalg.norm(self.data.qpos - self.target_qpos[self.frame_number], axis=1)
-        qvel_diff = np.linalg.norm(self.data.qvel - self.target_qvel[self.frame_number], axis=1)
+        qpos_diff = np.linalg.norm(self.data.qpos - self.target_qpos[self.frame_number], axis=0)
+        qvel_diff = np.linalg.norm(self.data.qvel - self.target_qvel[self.frame_number], axis=0)
         return -np.sum(qpos_diff) - np.sum(qvel_diff)
