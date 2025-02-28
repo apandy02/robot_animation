@@ -1,7 +1,6 @@
 
 import os
 
-import gymnasium as gym
 from data_processing import robot_data_to_qpos_qvel
 from gymnasium.envs.registration import register
 
