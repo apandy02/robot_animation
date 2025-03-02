@@ -1,12 +1,10 @@
 import argparse
 import sys
-import numpy as np
-import mediapy as media
 
 import gymnasium as gym
+import mediapy as media
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.logger import configure
 
 from robot_animation.env import RobotAnimationEnv  # noqa: F401
 
