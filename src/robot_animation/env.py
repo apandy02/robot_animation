@@ -13,6 +13,7 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
     """
     metadata = {
         "render_modes": ["human", "rgb_array", "depth_array"],
+        "render_fps": 500
     }
     def __init__(
         self,
@@ -50,6 +51,7 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
             dummy_frame_skip,
             observation_space=observation_space,
             default_camera_config=DEFAULT_CAMERA_CONFIG,
+            render_mode="human",
             **kwargs,
         )
 
