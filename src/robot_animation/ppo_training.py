@@ -69,7 +69,7 @@ def main():
         env = gym.make(args.env)
         env = make_vec_env(lambda: env, n_envs=args.n_envs)
 
-        model = PPO("MlpPolicy", env, verbose=1)
+        model = PPO("MlpPolicy", env, learning_rate=0.0001, batch_size=64, verbose=1)
         model.learn(total_timesteps=args.timesteps)
         
         # Evaluate the model and collect frames
