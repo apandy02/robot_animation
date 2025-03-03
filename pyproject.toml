@@ -16,6 +16,7 @@ dependencies = [
     "robot-descriptions>=1.14.0",
     "ruff>=0.9.9",
     "stable-baselines3[extra]>=2.5.0",
+    "wandb>=0.19.7",
 ]
 
 [build-system]

@@ -7,6 +7,7 @@ import gymnasium as gym
 import mediapy as media
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
+from wandb.integration.sb3 import WandbCallback
 
 from robot_animation.data_processing import robot_data_to_qpos_qvel
 
@@ -107,7 +108,7 @@ def main():
         )
 
         model = PPO("MlpPolicy", env, batch_size=64, verbose=1, device="cpu")
-        model.learn(total_timesteps=args.timesteps)
+        model.learn(total_timesteps=args.timesteps, callback=WandbCallback())
         
         eval_env = gym.make(
             args.env,
