@@ -13,7 +13,10 @@ from wandb.integration.sb3 import WandbCallback
 from wandb.sdk.wandb_run import Run
 
 import wandb
-from robot_animation.data_processing import robot_data_to_qpos_qvel, process_raw_robot_data
+from robot_animation.data_processing import (
+    process_raw_robot_data,
+    robot_data_to_qpos_qvel,
+)
 
 DEFAULT_CSV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/kuka_2.csv"))
 MODEL_SAVE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../models"))

@@ -1,8 +1,12 @@
 
 import os
 
-from robot_animation.data_processing import robot_data_to_qpos_qvel, process_raw_robot_data
 from gymnasium.envs.registration import register
+
+from robot_animation.data_processing import (
+    process_raw_robot_data,
+    robot_data_to_qpos_qvel,
+)
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.abspath(os.path.join(current_dir, "../../robot_models/kuka_iiwa/scene.xml"))
