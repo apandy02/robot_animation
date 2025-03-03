@@ -8,10 +8,13 @@ dependencies = [
     "gymnasium>=1.0.0",
     "imageio>=2.37.0",
     "ipykernel>=6.29.5",
+    "isort>=6.0.1",
     "mediapy>=1.2.2",
     "mujoco>=3.2.7",
     "pandas>=2.2.3",
+    "pre-commit>=4.1.0",
     "robot-descriptions>=1.14.0",
+    "ruff>=0.9.9",
     "stable-baselines3[extra]>=2.5.0",
 ]
 
@@ -21,3 +24,18 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+# Enable flake8-bugbear ('B') rules
+select = ["E", "F", "B"]
+
+# Never enforce `E501` (line length violations)
+ignore = ["E501"]

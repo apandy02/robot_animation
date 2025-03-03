@@ -23,6 +23,7 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         target_qvel: np.ndarray,
         num_q: int,
         reset_noise_scale: float = 0.1,
+        render_mode: str = "human",
         **kwargs,
     ):
         utils.EzPickle.__init__(
@@ -51,7 +52,7 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
             dummy_frame_skip,
             observation_space=observation_space,
             default_camera_config=DEFAULT_CAMERA_CONFIG,
-            render_mode="human",
+            render_mode=render_mode,
             **kwargs,
         )
 
