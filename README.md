@@ -2,6 +2,28 @@
 
 This repository contains the code for the Heartificial Implementation of Expressive Robot behavior transfer from animation to simulation.
 
+## Table of Contents
+
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+  - [Setup](#setup)
+- [Running the Project](#running-the-project)
+- [Linting and Formatting](#linting-and-formatting)
+
+## Project Structure
+
+```
+robot_animation/
+├── src/                    # Source code directory
+│   └── robot_animation/    # Main package containing core functionality
+├── data/                   # Data directory for storing datasets and processed data
+├── models/                 # Directory for storing trained models and checkpoints
+├── experimentation/        # Directory for experimental code and notebooks
+├── blender/               # Blender-related files and assets
+├── robot_models/          # Robot model definitions and assets
+└── pyproject.toml         # Project configuration and dependencies
+```
+
 ## Getting Started
 
 ### Setup
