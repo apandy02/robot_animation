@@ -1,5 +1,4 @@
 import argparse
-import logging
 import os
 import sys
 from typing import Callable
@@ -7,24 +6,14 @@ from typing import Callable
 import gymnasium as gym
 import mediapy as media
 import numpy as np
-import wandb
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.monitor import Monitor
 from wandb.integration.sb3 import WandbCallback
+from wandb.sdk.wandb_run import Run
 
+import wandb
 from robot_animation.data_processing import robot_data_to_qpos_qvel
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-
-logger = logging.getLogger("ppo_training")
-
 
 DEFAULT_CSV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/kuka_formatted2.csv"))
 MODEL_SAVE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../models"))
@@ -39,31 +28,10 @@ def main() -> tuple[list[np.ndarray], int]:
     """
     try:
         args = parse_args()
+        run, wandb_callback = setup_wandb(args.env, args.n_envs, args.timesteps)
+        target_qpos, target_qvel = robot_data_to_qpos_qvel(csv_path=args.csv_path,num_q=7)
+        env = make_vec_env(make_env(args.env, target_qpos, target_qvel),n_envs=args.n_envs)
         
-        run = wandb.init(
-            project="robot-animation",
-            config={
-                "algorithm": "PPO",
-                "env_id": args.env,
-                "n_envs": args.n_envs,
-                "total_timesteps": args.timesteps,
-                "batch_size": 64,
-            },
-            sync_tensorboard=True,
-            monitor_gym=True,
-            save_code=True,
-        )
-        
-        target_qpos, target_qvel = robot_data_to_qpos_qvel(
-            csv_path=args.csv_path,
-            num_q=7
-        )
-        
-        env = make_vec_env(
-            make_env(args.env, target_qpos, target_qvel),
-            n_envs=args.n_envs
-        )
-
         model = PPO(
             "MlpPolicy", 
             env, 
@@ -72,14 +40,6 @@ def main() -> tuple[list[np.ndarray], int]:
             device="cpu",
             tensorboard_log=f"runs/{run.id}" if run is not None else None
         )
-        
-        wandb_callback = WandbCallback(
-            model_save_path=MODEL_SAVE_PATH,
-            verbose=2,
-            gradient_save_freq=100,
-            model_save_freq=10000,
-        )
-        
         model.learn(total_timesteps=args.timesteps, callback=wandb_callback)
         
         eval_env = gym.make(
@@ -91,12 +51,10 @@ def main() -> tuple[list[np.ndarray], int]:
             reset_noise_scale=0.1,
             render_mode="rgb_array"
         )
-
         frames = evaluate_policy(model, eval_env, num_episodes=5)
-        media.show_video(frames, fps=30)
         
+        media.show_video(frames, fps=30)
         model.save("ppo_robot_animation")
-
         env.close()
         eval_env.close()
         
@@ -109,12 +67,13 @@ def main() -> tuple[list[np.ndarray], int]:
         print(f"Error: {e}")
         if 'run' in locals() and run is not None:
             run.finish()
+        
         return None, 1
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command line arguments"""
     parser = argparse.ArgumentParser(description='Train a PPO agent for robot animation')
-    
     parser.add_argument('--env', type=str, default="RobotAnimationEnv-kuka", help='Environment ID')
     parser.add_argument('--n_envs', type=int, default=2, help='Number of environments to run in parallel')
     parser.add_argument('--timesteps', type=int, default=100000, help='Total timesteps to train for')
@@ -126,6 +85,29 @@ def parse_args() -> argparse.Namespace:
     )
     
     return parser.parse_args()
+
+
+def setup_wandb(env: str, n_envs: int, timesteps: int) -> tuple[Run, WandbCallback]:
+    """
+    Setup Weights and Biases for experiment tracking.
+    """
+    run = wandb.init(
+        project="robot-animation",
+        config={
+            "algorithm": "PPO",
+            "env_id": env,
+            "n_envs": n_envs,
+            "total_timesteps": timesteps,
+            "batch_size": 64,
+        },
+        sync_tensorboard=True,
+        monitor_gym=True,
+        save_code=True,
+    )
+    wandb_callback = WandbCallback(
+        model_save_path=MODEL_SAVE_PATH,verbose=2, gradient_save_freq=100,model_save_freq=10000
+    )
+    return run, wandb_callback
 
 
 def make_env(env_id: str, target_qpos: np.ndarray, target_qvel: np.ndarray) -> Callable[[], gym.Env]:
