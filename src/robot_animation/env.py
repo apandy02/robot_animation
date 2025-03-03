@@ -10,9 +10,11 @@ DEFAULT_CAMERA_CONFIG = {
 class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
     """
     Custom environment definition for transferring robot behavior from animation to simulation using RL.
+    Defines the robot model, the action space, the observation space, and the imitation reward function.
     """
     metadata = {
         "render_modes": ["human", "rgb_array", "depth_array"],
+        "render_fps": 500
     }
     def __init__(
         self,
@@ -22,6 +24,7 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         target_qvel: np.ndarray,
         num_q: int,
         reset_noise_scale: float = 0.1,
+        render_mode: str = "human",
         **kwargs,
     ):
         utils.EzPickle.__init__(
@@ -50,6 +53,7 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
             dummy_frame_skip,
             observation_space=observation_space,
             default_camera_config=DEFAULT_CAMERA_CONFIG,
+            render_mode=render_mode,
             **kwargs,
         )
 
@@ -126,6 +130,9 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         return observation
     
     def _imitation_reward(self):
+        """
+        Reward function that penalizes the agent for deviating from the target qpos and qvel.
+        """
         qpos_diff = np.linalg.norm(self.data.qpos - self.target_qpos[self.frame_number], axis=0)
         qvel_diff = np.linalg.norm(self.data.qvel - self.target_qvel[self.frame_number], axis=0)
         return -np.sum(qpos_diff) - np.sum(qvel_diff)

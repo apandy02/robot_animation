@@ -29,6 +29,23 @@ This repository contains the code for the Heartificial Implementation of Express
    uv sync
    ```
 
+4. Set up Weights & Biases:
+   
+   a. Create a W&B account at https://docs.wandb.ai/quickstart/ if you don't have one
+   
+   b. Get your API key from your W&B account settings
+   
+   c. Add your API key to your shell configuration file:
+   ```bash
+   echo 'export WANDB_API_KEY=your_api_key_here' >> ~/.bashrc  # or ~/.bash_profile or ~/.zshrc
+   source ~/.bashrc  # or the appropriate file you modified
+   ```
+   
+   d. Login to W&B:
+   ```bash
+   uv run wandb login
+   ```
+
 ## Running the Project
 
 To train the robot using PPO:

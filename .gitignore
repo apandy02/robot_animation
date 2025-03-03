@@ -4,3 +4,6 @@
 *.pyc
 *.egg-info
 */MUJOCO_LOG.TXT
+MUJOCO_LOG.TXT
+runs/*
+wandb/*
