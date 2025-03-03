@@ -13,11 +13,12 @@ from wandb.integration.sb3 import WandbCallback
 from wandb.sdk.wandb_run import Run
 
 import wandb
-from robot_animation.data_processing import robot_data_to_qpos_qvel
+from robot_animation.data_processing import robot_data_to_qpos_qvel, process_raw_robot_data
 
-DEFAULT_CSV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/kuka_formatted2.csv"))
+DEFAULT_CSV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/kuka_2.csv"))
 MODEL_SAVE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../models"))
 
+print(f"DEFAULT_CSV_PATH: {DEFAULT_CSV_PATH}")
 
 def main() -> tuple[list[np.ndarray], int]:
     """
@@ -28,8 +29,10 @@ def main() -> tuple[list[np.ndarray], int]:
     """
     try:
         args = parse_args()
+        
         run, wandb_callback = setup_wandb(args.env, args.n_envs, args.timesteps)
-        target_qpos, target_qvel = robot_data_to_qpos_qvel(csv_path=args.csv_path,num_q=7)
+        animation_df = process_raw_robot_data(args.csv_path)
+        target_qpos, target_qvel = robot_data_to_qpos_qvel(animation_df, num_q=7)
         env = make_vec_env(make_env(args.env, target_qpos, target_qvel),n_envs=args.n_envs)
         
         model = PPO(
@@ -67,8 +70,7 @@ def main() -> tuple[list[np.ndarray], int]:
         print(f"Error: {e}")
         if 'run' in locals() and run is not None:
             run.finish()
-        
-        return None, 1
+        raise e
 
 
 def parse_args() -> argparse.Namespace:
