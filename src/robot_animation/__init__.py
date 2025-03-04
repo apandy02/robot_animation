@@ -22,7 +22,7 @@ register(
     max_episode_steps=1000,
     kwargs={
         'model_path': model_path,
-        'animation_frame_rate': 420,
+        'animation_frame_rate': 153,
         'target_qpos': target_qpos,
         'target_qvel': target_qvel,
         'num_q': 7
