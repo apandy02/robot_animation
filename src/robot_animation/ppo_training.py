@@ -6,13 +6,13 @@ from typing import Callable
 import gymnasium as gym
 import mediapy as media
 import numpy as np
-import wandb
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.monitor import Monitor
 from wandb.integration.sb3 import WandbCallback
 from wandb.sdk.wandb_run import Run
 
+import wandb
 from robot_animation.data_processing import (
     process_raw_robot_data,
     robot_data_to_qpos_qvel,
@@ -20,8 +20,6 @@ from robot_animation.data_processing import (
 
 DEFAULT_CSV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/kuka_2.csv"))
 MODEL_SAVE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../models"))
-
-print(f"DEFAULT_CSV_PATH: {DEFAULT_CSV_PATH}")
 
 def main() -> int:
     """
@@ -36,12 +34,18 @@ def main() -> int:
         
         animation_df = process_raw_robot_data(args.csv_path)
         target_qpos, target_qvel = robot_data_to_qpos_qvel(animation_df, num_q=7)
-        env = make_vec_env(make_env(args.env, target_qpos, target_qvel, args.animation_fps),n_envs=args.n_envs)
+
+        env = make_vec_env(
+            make_env(args.env, target_qpos, target_qvel, args.animation_fps),
+            n_envs=args.n_envs,
+            #vec_env_cls=SubprocVecEnv
+        )
         
         model = PPO(
             "MlpPolicy", 
             env, 
-            batch_size=64, 
+            batch_size=64,
+            learning_rate=0.0002,
             verbose=1, 
             device="cpu",
             tensorboard_log=f"runs/{run.id}" if run is not None else None
@@ -81,7 +85,7 @@ def parse_args() -> argparse.Namespace:
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description='Train a PPO agent for robot animation')
     parser.add_argument('--env', type=str, default="RobotAnimationEnv-kuka", help='Environment ID')
-    parser.add_argument('--n_envs', type=int, default=2, help='Number of environments to run in parallel')
+    parser.add_argument('--n_envs', type=int, default=7, help='Number of environments to run in parallel')
     parser.add_argument('--timesteps', type=int, default=100000, help='Total timesteps to train for')
     parser.add_argument(
         '--csv_path',
@@ -98,6 +102,7 @@ def setup_wandb(env: str, n_envs: int, timesteps: int) -> tuple[Run, WandbCallba
     """
     Setup Weights and Biases for experiment tracking.
     """
+    #TODO: Setup video logging
     run = wandb.init(
         project="robot-animation",
         config={

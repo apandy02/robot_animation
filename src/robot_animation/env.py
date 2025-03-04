@@ -57,7 +57,7 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
             **kwargs,
         )
 
-        self.frame_skip = int(animation_frame_rate * self.model.opt.timestep)
+        self.frame_skip = int(1 / (animation_frame_rate * self.model.opt.timestep))
     
     @property
     def num_q(self):
