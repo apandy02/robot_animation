@@ -39,13 +39,14 @@ def main() -> int:
         env = make_vec_env(
             make_env(args.env, target_qpos, target_qvel, args.animation_fps),
             n_envs=args.n_envs,
-            vec_env_cls=SubprocVecEnv
+            #vec_env_cls=SubprocVecEnv
         )
         
         model = PPO(
             "MlpPolicy", 
             env, 
-            batch_size=64, 
+            batch_size=64,
+            learning_rate=0.0002,
             verbose=1, 
             device="cpu",
             tensorboard_log=f"runs/{run.id}" if run is not None else None
@@ -85,7 +86,7 @@ def parse_args() -> argparse.Namespace:
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description='Train a PPO agent for robot animation')
     parser.add_argument('--env', type=str, default="RobotAnimationEnv-kuka", help='Environment ID')
-    parser.add_argument('--n_envs', type=int, default=4, help='Number of environments to run in parallel')
+    parser.add_argument('--n_envs', type=int, default=7, help='Number of environments to run in parallel')
     parser.add_argument('--timesteps', type=int, default=100000, help='Total timesteps to train for')
     parser.add_argument(
         '--csv_path',
