@@ -23,20 +23,20 @@ MODEL_SAVE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../..
 
 print(f"DEFAULT_CSV_PATH: {DEFAULT_CSV_PATH}")
 
-def main() -> tuple[list[np.ndarray], int]:
+def main() -> int:
     """
     Main function to train a PPO agent that transfers robot behaviors generated in blender to real robot.
-    Target behavior is specified by a CSV file containing the target qpos and qvel.
+    Target behavior is specified by a CSV file containing the target qpos and qvel. TODO: fix 
     The PPO agent is trained using the Stable Baselines3 library using a custom mujoco environment.
     We use Weights and Biases for experiment tracking.
     """
     try:
         args = parse_args()
-        
         run, wandb_callback = setup_wandb(args.env, args.n_envs, args.timesteps)
+        
         animation_df = process_raw_robot_data(args.csv_path)
         target_qpos, target_qvel = robot_data_to_qpos_qvel(animation_df, num_q=7)
-        env = make_vec_env(make_env(args.env, target_qpos, target_qvel),n_envs=args.n_envs)
+        env = make_vec_env(make_env(args.env, target_qpos, target_qvel, args.animation_fps),n_envs=args.n_envs)
         
         model = PPO(
             "MlpPolicy", 
@@ -50,7 +50,7 @@ def main() -> tuple[list[np.ndarray], int]:
         
         eval_env = gym.make(
             args.env,
-            animation_frame_rate=460,
+            animation_frame_rate=args.animation_fps,
             target_qpos=target_qpos,
             target_qvel=target_qvel,
             num_q=7,
@@ -59,7 +59,7 @@ def main() -> tuple[list[np.ndarray], int]:
         )
         frames = evaluate_policy(model, eval_env, num_episodes=5)
         
-        media.show_video(frames, fps=30)
+        media.show_video(frames, fps=args.animation_fps)
         model.save("ppo_robot_animation")
         env.close()
         eval_env.close()
@@ -67,13 +67,14 @@ def main() -> tuple[list[np.ndarray], int]:
         if run is not None:
             run.finish()
         
-        return frames, 0
+        return 0
 
     except Exception as e:
         print(f"Error: {e}")
         if 'run' in locals() and run is not None:
             run.finish()
-        raise e
+        
+        return 1
 
 
 def parse_args() -> argparse.Namespace:
@@ -88,6 +89,7 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_CSV_PATH,
         help='Path to the CSV file containing the animation data'
     )
+    parser.add_argument('--animation_fps', type=int, default=153, help='Frame rate of the animation')
     
     return parser.parse_args()
 
@@ -115,7 +117,9 @@ def setup_wandb(env: str, n_envs: int, timesteps: int) -> tuple[Run, WandbCallba
     return run, wandb_callback
 
 
-def make_env(env_id: str, target_qpos: np.ndarray, target_qvel: np.ndarray) -> Callable[[], gym.Env]:
+def make_env(
+        env_id: str, target_qpos: np.ndarray, target_qvel: np.ndarray, animation_fps: int
+    ) -> Callable[[], gym.Env]:
     """
     Create a function that will create and return a fresh instance of the environment.
     Enables parallel environment creation.
@@ -123,13 +127,14 @@ def make_env(env_id: str, target_qpos: np.ndarray, target_qvel: np.ndarray) -> C
         env_id: The id of the environment to make
         target_qpos: The target qpos of the environment
         target_qvel: The target qvel of the environment
+        animation_fps: The frame rate of the animation
     Returns:
         A function that will create and return a fresh instance of the environment
     """
     def _init():
         env = gym.make(
             env_id,
-            animation_frame_rate=460,
+            animation_frame_rate=animation_fps,
             target_qpos=target_qpos,
             target_qvel=target_qvel,
             num_q=7,
@@ -176,5 +181,5 @@ def evaluate_policy(model: PPO, env: gym.Env, num_episodes: int = 1) -> list[np.
 
 
 if __name__ == "__main__":
-    frames, exit_code = main()
+    exit_code = main()
     sys.exit(exit_code)
