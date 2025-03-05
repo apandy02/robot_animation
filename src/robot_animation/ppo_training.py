@@ -41,9 +41,10 @@ def main() -> int:
         model = PPO(
             "MlpPolicy", 
             env, 
-            batch_size=64, 
+            batch_size=4, 
             verbose=1, 
             device="cpu",
+            n_epochs=5,
             tensorboard_log=f"runs/{run.id}" if run is not None else None
         )
         model.learn(total_timesteps=args.timesteps, callback=wandb_callback)
@@ -105,7 +106,7 @@ def setup_wandb(env: str, n_envs: int, timesteps: int) -> tuple[Run, WandbCallba
             "env_id": env,
             "n_envs": n_envs,
             "total_timesteps": timesteps,
-            "batch_size": 64,
+            "batch_size": 8,
         },
         sync_tensorboard=True,
         monitor_gym=True,

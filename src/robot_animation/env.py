@@ -133,6 +133,6 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         """
         Reward function that penalizes the agent for deviating from the target qpos and qvel.
         """
-        qpos_diff = np.linalg.norm(self.data.qpos - self.target_qpos[self.frame_number], axis=0)
-        qvel_diff = np.linalg.norm(self.data.qvel - self.target_qvel[self.frame_number], axis=0)
+        qpos_diff = np.linalg.norm(self.data.qpos.copy() - self.target_qpos[self.frame_number], axis=0)
+        qvel_diff = np.linalg.norm(self.data.qvel.copy() - self.target_qvel[self.frame_number], axis=0)
         return -np.sum(qpos_diff) - np.sum(qvel_diff)
