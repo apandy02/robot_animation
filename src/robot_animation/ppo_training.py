@@ -41,7 +41,7 @@ def main() -> int:
         model = PPO(
             "MlpPolicy", 
             env, 
-            batch_size=4, 
+            batch_size=64, 
             verbose=1, 
             device="cpu",
             n_epochs=5,
@@ -106,7 +106,7 @@ def setup_wandb(env: str, n_envs: int, timesteps: int) -> tuple[Run, WandbCallba
             "env_id": env,
             "n_envs": n_envs,
             "total_timesteps": timesteps,
-            "batch_size": 8,
+            "batch_size": 64,
         },
         sync_tensorboard=True,
         monitor_gym=True,
