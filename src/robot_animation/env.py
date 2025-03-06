@@ -57,7 +57,7 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
             **kwargs,
         )
 
-        self.frame_skip = int(1 / animation_frame_rate * self.model.opt.timestep)
+        self.frame_skip = int(1 / (animation_frame_rate * self.model.opt.timestep))
     
     @property
     def num_q(self):
@@ -135,4 +135,4 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         """
         qpos_diff = np.linalg.norm(self.data.qpos - self.target_qpos[self.frame_number], axis=0)
         qvel_diff = np.linalg.norm(self.data.qvel - self.target_qvel[self.frame_number], axis=0)
-        return -np.sum(qpos_diff) - np.sum(qvel_diff)
+        return -0.5*np.sum(qpos_diff) - 0.5*np.sum(qvel_diff)
