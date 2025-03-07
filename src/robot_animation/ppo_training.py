@@ -34,8 +34,12 @@ def main() -> int:
         run, wandb_callback = setup_wandb(args.env, args.n_envs, args.timesteps)
         
         animation_df = process_raw_robot_data(args.csv_path)
-        target_qpos, target_qvel = robot_data_to_qpos_qvel(animation_df, num_q=7)
-        # Flip sign of 3rd joint values (joint index 2)
+        target_qpos, _ = robot_data_to_qpos_qvel(animation_df, num_q=7)
+
+        target_qvel = np.zeros_like(target_qpos)
+        target_qvel[1:] = (target_qpos[1:] - target_qpos[:-1]) * args.animation_fps # TODO: shift this upstream
+        target_qvel[0] = np.zeros(target_qpos.shape[1])  
+        
         target_qpos[:, 3], target_qvel[:, 3] = -target_qpos[:, 3], -target_qvel[:, 3]
         
         env = make_vec_env(make_env(args.env, target_qpos, target_qvel, args.animation_fps),n_envs=args.n_envs)
