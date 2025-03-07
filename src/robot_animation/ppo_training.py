@@ -21,7 +21,6 @@ from robot_animation.data_processing import (
 DEFAULT_CSV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/kuka_2.csv"))
 MODEL_SAVE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../models"))
 
-print(f"DEFAULT_CSV_PATH: {DEFAULT_CSV_PATH}")
 
 def main() -> int:
     """
@@ -35,13 +34,20 @@ def main() -> int:
         run, wandb_callback = setup_wandb(args.env, args.n_envs, args.timesteps)
         
         animation_df = process_raw_robot_data(args.csv_path)
-        target_qpos, target_qvel = robot_data_to_qpos_qvel(animation_df, num_q=7)
+        target_qpos, _ = robot_data_to_qpos_qvel(animation_df, num_q=7)
+
+        target_qvel = np.zeros_like(target_qpos)
+        target_qvel[1:] = (target_qpos[1:] - target_qpos[:-1]) * args.animation_fps # TODO: shift this upstream
+        target_qvel[0] = np.zeros(target_qpos.shape[1])  
+        
+        target_qpos[:, 3], target_qvel[:, 3] = -target_qpos[:, 3], -target_qvel[:, 3]
+        
         env = make_vec_env(make_env(args.env, target_qpos, target_qvel, args.animation_fps),n_envs=args.n_envs)
         
         model = PPO(
             "MlpPolicy", 
             env, 
-            batch_size=4, 
+            batch_size=8, 
             verbose=1, 
             device="cpu",
             n_epochs=5,
@@ -74,15 +80,15 @@ def main() -> int:
         print(f"Error: {e}")
         if 'run' in locals() and run is not None:
             run.finish()
-        
-        return 1
+
+        raise e
 
 
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description='Train a PPO agent for robot animation')
     parser.add_argument('--env', type=str, default="RobotAnimationEnv-kuka", help='Environment ID')
-    parser.add_argument('--n_envs', type=int, default=2, help='Number of environments to run in parallel')
+    parser.add_argument('--n_envs', type=int, default=7, help='Number of environments to run in parallel')
     parser.add_argument('--timesteps', type=int, default=100000, help='Total timesteps to train for')
     parser.add_argument(
         '--csv_path',
@@ -90,7 +96,7 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_CSV_PATH,
         help='Path to the CSV file containing the animation data'
     )
-    parser.add_argument('--animation_fps', type=int, default=153, help='Frame rate of the animation')
+    parser.add_argument('--animation_fps', type=int, default=25, help='Frame rate of the animation')
     
     return parser.parse_args()
 
@@ -171,8 +177,10 @@ def evaluate_policy(model: PPO, env: gym.Env, num_episodes: int = 1) -> list[np.
             
             obs, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
+            print(f"{env.render_mode=}")
             
             frame = env.render()
+            
             if frame is not None:
                 episode_frames.append(frame)
         
