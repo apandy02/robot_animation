@@ -97,6 +97,7 @@ def parse_args() -> argparse.Namespace:
         help='Path to the CSV file containing the animation data'
     )
     parser.add_argument('--animation_fps', type=int, default=25, help='Frame rate of the animation')
+    parser.add_argument('--batch_size', type=int, default=16, help='Batch size for training')
     
     return parser.parse_args()
 
