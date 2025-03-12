@@ -37,6 +37,7 @@ robot_animation/
    or using wget:
    ```bash
    wget -qO- https://astral.sh/uv/install.sh | sh
+   source $HOME/.local/bin/env
    ```
 
 2. Clone the repository:

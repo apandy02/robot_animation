@@ -44,7 +44,7 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         self.max_frames = len(target_qpos)
         self.frame_number = 1
 
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(num_q * 2,), dtype=np.float64)
+        observation_space = Box(low=-np.inf, high=np.inf, shape=(num_q * 2 + 1,), dtype=np.float64)
         dummy_frame_skip = 1
 
         MujocoEnv.__init__(
@@ -103,13 +103,8 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         noise_low = -self._reset_noise_scale
         noise_high = self._reset_noise_scale
 
-        qpos = self.init_qpos + self.np_random.uniform(
-            low=noise_low, high=noise_high, size=self.model.nq
-        )
-        qvel = (
-            self.init_qvel
-            + self._reset_noise_scale * self.np_random.standard_normal(self.model.nv)
-        )
+        qpos = self.init_qpos + self.np_random.uniform(low=noise_low, high=noise_high, size=self.model.nq)
+        qvel = self.init_qvel + self._reset_noise_scale * self.np_random.standard_normal(self.model.nv)
 
         self.set_state(qpos, qvel)
         observation = self._get_obs()
@@ -125,8 +120,8 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
     def _get_obs(self):
         position = self.data.qpos.flat.copy()
         velocity = self.data.qvel.flat.copy()
-
-        observation = np.concatenate((position, velocity)).ravel()
+        phase_signal = self.frame_number / self.max_frames
+        observation = np.concatenate((position, velocity, [phase_signal])).ravel()
         return observation
     
     def _imitation_reward(self):

@@ -9,6 +9,7 @@ import numpy as np
 import wandb
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.monitor import Monitor
 from wandb.integration.sb3 import WandbCallback
 from wandb.sdk.wandb_run import Run
@@ -42,8 +43,7 @@ def main() -> int:
         
         target_qpos[:, 3], target_qvel[:, 3] = -target_qpos[:, 3], -target_qvel[:, 3]
         
-        env = make_vec_env(make_env(args.env, target_qpos, target_qvel, args.animation_fps),n_envs=args.n_envs)
-        
+        env = SubprocVecEnv([make_env(args.env, target_qpos, target_qvel, args.animation_fps) for i in range(args.n_envs)])
         model = PPO(
             "MlpPolicy", 
             env, 
@@ -62,7 +62,7 @@ def main() -> int:
             target_qvel=target_qvel,
             num_q=7,
             reset_noise_scale=0.1,
-            render_mode="rgb_array"
+            # render_mode="rgb_array"
         )
         frames = evaluate_policy(model, eval_env, num_episodes=5)
         
@@ -96,7 +96,7 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_CSV_PATH,
         help='Path to the CSV file containing the animation data'
     )
-    parser.add_argument('--animation_fps', type=int, default=25, help='Frame rate of the animation')
+    parser.add_argument('--animation_fps', type=int, default=153, help='Frame rate of the animation')
     parser.add_argument('--batch_size', type=int, default=16, help='Batch size for training')
     
     return parser.parse_args()
@@ -178,7 +178,6 @@ def evaluate_policy(model: PPO, env: gym.Env, num_episodes: int = 1) -> list[np.
             
             obs, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
-            print(f"{env.render_mode=}")
             
             frame = env.render()
             
