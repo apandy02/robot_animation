@@ -2,6 +2,7 @@ import numpy as np
 from gymnasium import utils
 from gymnasium.envs.mujoco import MujocoEnv
 from gymnasium.spaces import Box
+import gymnasium as gym
 
 DEFAULT_CAMERA_CONFIG = {
     "distance": 4.0,
@@ -131,3 +132,4 @@ class RobotAnimationEnv(MujocoEnv, utils.EzPickle):
         qpos_diff = np.linalg.norm(self.data.qpos - self.target_qpos[self.frame_number], axis=0)
         qvel_diff = np.linalg.norm(self.data.qvel - self.target_qvel[self.frame_number], axis=0)
         return -0.65*np.sum(qpos_diff) - 0.35*np.sum(qvel_diff)
+

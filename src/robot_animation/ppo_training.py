@@ -88,7 +88,7 @@ def parse_args() -> argparse.Namespace:
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description='Train a PPO agent for robot animation')
     parser.add_argument('--env', type=str, default="RobotAnimationEnv-kuka", help='Environment ID')
-    parser.add_argument('--n_envs', type=int, default=7, help='Number of environments to run in parallel')
+    parser.add_argument('--n_envs', type=int, default=2, help='Number of environments to run in parallel')
     parser.add_argument('--timesteps', type=int, default=100000, help='Total timesteps to train for')
     parser.add_argument(
         '--csv_path',
@@ -126,8 +126,13 @@ def setup_wandb(env: str, n_envs: int, timesteps: int) -> tuple[Run, WandbCallba
 
 
 def make_env(
-        env_id: str, target_qpos: np.ndarray, target_qvel: np.ndarray, animation_fps: int
-    ) -> Callable[[], gym.Env]:
+    env_id: str,
+    target_qpos: np.ndarray,
+    target_qvel: np.ndarray, 
+    animation_fps: int,
+    obs_norm: bool = True,
+    gamma: float = 0.99
+) -> Callable[[], gym.Env]:
     """
     Create a function that will create and return a fresh instance of the environment.
     Enables parallel environment creation.
@@ -150,7 +155,13 @@ def make_env(
             render_mode="rgb_array"
         )
         env = Monitor(env)
+        if obs_norm:
+            env = gym.wrappers.NormalizeObservation(env)
+            # env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10))
+
+        env = gym.wrappers.NormalizeReward(env, gamma=gamma)
         return env
+    
     return _init
 
 

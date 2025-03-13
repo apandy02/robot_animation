@@ -85,3 +85,10 @@ To run the linter and formatter:
 uvx isort .
 uvx ruff check . --fix
 ```
+
+## Debug
+
+```bash
+sudo apt-get update
+sudo apt-get install libgl1-mesa-glx
+```
