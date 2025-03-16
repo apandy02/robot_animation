@@ -8,11 +8,13 @@ import mediapy as media
 import numpy as np
 import wandb
 from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.monitor import Monitor
 from wandb.integration.sb3 import WandbCallback
 from wandb.sdk.wandb_run import Run
+from carbs import CARBS, Param, LogSpace, LinearSpace, CARBSParams, WandbLoggingParams # noqa - not using carbs for now
+from wandb_carbs import WandbCarbs, create_sweep # noqa - not using carbs for now
 
 from robot_animation.data_processing import (
     process_raw_robot_data,
@@ -28,11 +30,55 @@ def main() -> int:
     Main function to train a PPO agent that transfers robot behaviors generated in blender to real robot.
     Target behavior is specified by a CSV file containing the target qpos and qvel. TODO: fix 
     The PPO agent is trained using the Stable Baselines3 library using a custom mujoco environment.
-    We use Weights and Biases for experiment tracking.
+    We use Weights and Biases for experiment tracking and CARBS for hyperparameter optimization.
     """
     try:
         args = parse_args()
-        run, wandb_callback = setup_wandb(args.env, args.n_envs, args.timesteps)
+        run = None
+        wandb_callback = None
+
+        # Define CARBS parameter spaces
+        param_spaces = [
+            Param(name='learning_rate', space=LogSpace(min=1e-5, max=1e-3), search_center=1e-4),
+            Param(name='batch_size', space=LinearSpace(min=8, max=64, is_integer=True), search_center=32),
+            Param(name='n_epochs', space=LinearSpace(min=3, max=10, is_integer=True), search_center=6),
+            Param(name='n_steps', space=LinearSpace(min=512, max=2048, is_integer=True), search_center=1024)
+        ]
+
+        if args.track:
+            # Create CARBS sweep
+            """
+            # carbs stuff (frozen for now)
+            sweep_id = create_sweep(
+                sweep_name='PPO Robot Animation',
+                wandb_entity='aryaman-pandya-99',
+                wandb_project='robot-animation',
+                carb_params=param_spaces
+            )
+            print(f"Sweep ID: {sweep_id}")"""
+            run, wandb_callback = setup_wandb(args.env, args.n_envs, args.timesteps)
+            print(f"Run ID: {run.id}")
+            
+            # Create plots directory if it doesn't exist
+            plots_dir = os.path.join(os.path.dirname(__file__), "../../plots")
+            os.makedirs(plots_dir, exist_ok=True)
+            
+            """
+            carbs stuff (frozen for now)
+            carbs_params = CARBSParams(
+                # better_direction_sign=1,
+                is_wandb_logging_enabled=False,
+                # wandb_params=WandbLoggingParams(
+                #     run_id=run.id,
+                #     run_name=run.name,
+                #     group_name=run.group,
+                #     project_name=run.project,
+                #     root_dir=plots_dir
+                # )
+            )
+            carbs = CARBS(config=carbs_params, params=param_spaces)
+            wandb_carbs = WandbCarbs(carbs=carbs)
+            suggestion = wandb_carbs.suggest()"""
         
         animation_df = process_raw_robot_data(args.csv_path)
         target_qpos, _ = robot_data_to_qpos_qvel(animation_df, num_q=7)
@@ -43,17 +89,27 @@ def main() -> int:
         
         target_qpos[:, 3], target_qvel[:, 3] = -target_qpos[:, 3], -target_qvel[:, 3]
         
-        env = SubprocVecEnv([make_env(args.env, target_qpos, target_qvel, args.animation_fps) for i in range(args.n_envs)])
-        model = PPO(
-            "MlpPolicy", 
-            env, 
-            batch_size=8, 
-            verbose=1, 
-            device="cpu",
-            n_epochs=5,
-            tensorboard_log=f"runs/{run.id}" if run is not None else None
-        )
-        model.learn(total_timesteps=args.timesteps, callback=wandb_callback)
+        env = make_vec_env(make_env(args.env, target_qpos, target_qvel, args.animation_fps),n_envs=args.n_envs)
+
+        # Use CARBS suggestions if tracking
+        model_kwargs = {
+            "policy": "MlpPolicy",
+            "env": env,
+            "verbose": 1,
+            "device": "cpu",
+            "tensorboard_log": f"runs/{run.id}" if run is not None else None,
+            "learning_rate": 3e-4,
+            "batch_size": 8,
+            "n_epochs": 5,
+            "n_steps": 2048
+        }
+
+
+        model = PPO(**model_kwargs)
+        if args.track:
+            model.learn(total_timesteps=args.timesteps, callback=wandb_callback)
+        else:
+            model.learn(total_timesteps=args.timesteps)
         
         eval_env = gym.make(
             args.env,
@@ -66,12 +122,21 @@ def main() -> int:
         )
         frames = evaluate_policy(model, eval_env, num_episodes=5)
         
-        media.show_video(frames, fps=args.animation_fps)
+        # media.show_video(frames, fps=args.animation_fps)
         model.save("ppo_robot_animation")
         env.close()
         eval_env.close()
         
         if run is not None:
+            # Record final performance metrics
+            eval_reward = np.mean([evaluate_episode_reward(model, eval_env) for _ in range(5)])
+            """
+            # carbs stuff (frozen for now)
+            wandb_carbs.record_observation(
+                objective=eval_reward,
+                cost=args.timesteps # Using total timesteps as cost metric
+            )
+            """
             run.finish()
         
         return 0
@@ -98,6 +163,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument('--animation_fps', type=int, default=153, help='Frame rate of the animation')
     parser.add_argument('--batch_size', type=int, default=16, help='Batch size for training')
+    parser.add_argument('--track', action='store_true', help='Whether to track with wandb')
+    parser.add_argument('--multi_proc', action='store_true', help='Whether to use multiple processes for training')
     
     return parser.parse_args()
 
@@ -155,11 +222,13 @@ def make_env(
             render_mode="rgb_array"
         )
         env = Monitor(env)
+        """
+        # TODO: normalize obs and reward
         if obs_norm:
             env = gym.wrappers.NormalizeObservation(env)
             # env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10))
 
-        env = gym.wrappers.NormalizeReward(env, gamma=gamma)
+        env = gym.wrappers.NormalizeReward(env, gamma=gamma)"""
         return env
     
     return _init
@@ -198,6 +267,21 @@ def evaluate_policy(model: PPO, env: gym.Env, num_episodes: int = 1) -> list[np.
         all_frames.extend(episode_frames)
     
     return all_frames
+
+
+def evaluate_episode_reward(model: PPO, env: gym.Env) -> float:
+    """Helper function to evaluate total episode reward"""
+    obs, _ = env.reset()
+    done = False
+    total_reward = 0
+    
+    while not done:
+        action, _ = model.predict(obs, deterministic=True)
+        obs, reward, terminated, truncated, _ = env.step(action)
+        done = terminated or truncated
+        total_reward += reward
+        
+    return total_reward
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ name = "robot-animation"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "gymnasium>=1.0.0",
     "imageio>=2.37.0",
@@ -16,6 +16,7 @@ dependencies = [
     "robot-descriptions>=1.14.0",
     "ruff>=0.9.9",
     "stable-baselines3[extra]>=2.5.0",
+    "wandb_carbs @ git+ssh://git@github.com/apandy02/wandb_carbs.git",
     "wandb>=0.19.7",
 ]
 
@@ -40,3 +41,6 @@ select = ["E", "F", "B"]
 
 # Never enforce `E501` (line length violations)
 ignore = ["E501"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
