@@ -89,8 +89,18 @@ def main() -> int:
         
         target_qpos[:, 3], target_qvel[:, 3] = -target_qpos[:, 3], -target_qvel[:, 3]
         
-        env = make_vec_env(make_env(args.env, target_qpos, target_qvel, args.animation_fps),n_envs=args.n_envs)
-
+        if args.multi_proc:
+            env = make_vec_env(
+                make_env(args.env, target_qpos, target_qvel, args.animation_fps),
+                n_envs=args.n_envs,
+                vec_env_cls=SubprocVecEnv
+            )
+        else:
+            env = make_vec_env(
+                make_env(args.env, target_qpos, target_qvel, args.animation_fps),
+                n_envs=args.n_envs,
+                vec_env_cls=DummyVecEnv
+            )
         # Use CARBS suggestions if tracking
         model_kwargs = {
             "policy": "MlpPolicy",
@@ -101,7 +111,7 @@ def main() -> int:
             "learning_rate": 3e-4,
             "batch_size": 8,
             "n_epochs": 5,
-            "n_steps": 2048
+            "n_steps": 1024
         }
 
 
