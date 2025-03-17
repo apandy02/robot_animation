@@ -132,6 +132,11 @@ def main() -> int:
         )
         frames = evaluate_policy(model, eval_env, num_episodes=5)
         
+        # Save frames as video
+        video_path = os.path.join(os.path.dirname(__file__), "../../videos")
+        os.makedirs(video_path, exist_ok=True)
+        media.write_video(os.path.join(video_path, f"eval_video_{run.id if run else 'no_wandb'}.mp4"), frames, fps=args.animation_fps)
+        
         # media.show_video(frames, fps=args.animation_fps)
         model.save("ppo_robot_animation")
         env.close()
