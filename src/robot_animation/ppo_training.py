@@ -23,6 +23,8 @@ from robot_animation.data_processing import (
 
 DEFAULT_CSV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/kuka_2.csv"))
 MODEL_SAVE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../models"))
+VIDEO_PATH = os.path.join(os.path.dirname(__file__), "../../videos")
+os.makedirs(VIDEO_PATH, exist_ok=True)
 
 
 def main() -> int:
@@ -130,15 +132,9 @@ def main() -> int:
             reset_noise_scale=0.1,
             # render_mode="rgb_array"
         )
-        frames = evaluate_policy(model, eval_env, num_episodes=5)
         
-        # Save frames as video
-        video_path = os.path.join(os.path.dirname(__file__), "../../videos")
-        os.makedirs(video_path, exist_ok=True)
-        media.write_video(os.path.join(video_path, f"eval_video_{run.id if run else 'no_wandb'}.mp4"), frames, fps=args.animation_fps)
-        
-        # media.show_video(frames, fps=args.animation_fps)
-        model.save("ppo_robot_animation")
+        evaluate_policy(model, eval_env, num_episodes=5)
+        model.save(f"{MODEL_SAVE_PATH}/ppo_robot_animation_{run.id if run else 'no_wandb'}")
         env.close()
         eval_env.close()
         

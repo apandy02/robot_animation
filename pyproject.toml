@@ -16,7 +16,6 @@ dependencies = [
     "robot-descriptions>=1.14.0",
     "ruff>=0.9.9",
     "stable-baselines3[extra]>=2.5.0",
-    "wandb_carbs @ git+ssh://git@github.com/apandy02/wandb_carbs.git",
     "wandb>=0.19.7",
 ]
 

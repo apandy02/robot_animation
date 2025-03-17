@@ -9,3 +9,4 @@ runs/*
 wandb/*
 *.icloud
 checkpoints/*
+*.zip
