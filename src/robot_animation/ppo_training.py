@@ -4,17 +4,23 @@ import sys
 from typing import Callable
 
 import gymnasium as gym
-import mediapy as media
 import numpy as np
 import wandb
+from carbs import (  # noqa - not using carbs for now
+    CARBS,
+    CARBSParams,
+    LinearSpace,
+    LogSpace,
+    Param,
+    WandbLoggingParams,
+)
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from wandb.integration.sb3 import WandbCallback
 from wandb.sdk.wandb_run import Run
-from carbs import CARBS, Param, LogSpace, LinearSpace, CARBSParams, WandbLoggingParams # noqa - not using carbs for now
-from wandb_carbs import WandbCarbs, create_sweep # noqa - not using carbs for now
+from wandb_carbs import WandbCarbs, create_sweep  # noqa - not using carbs for now
 
 from robot_animation.data_processing import (
     process_raw_robot_data,

@@ -1,14 +1,13 @@
 
 import os
 
+import numpy as np
 from gymnasium.envs.registration import register
 
 from robot_animation.data_processing import (
     process_raw_robot_data,
     robot_data_to_qpos_qvel,
 )
-
-import numpy as np
 
 animation_fps = 153
 
