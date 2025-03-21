@@ -25,13 +25,14 @@ target_qvel[0] = np.zeros(target_qpos.shape[1])
 
 register(
     id='RobotAnimationEnv-kuka',
-    entry_point='robot_animation.env:RobotAnimationEnv',
+    entry_point='robot_animation.environments.kuka_iiwa4:KukaIIWA4Env',
     max_episode_steps=1000,
     kwargs={
         'model_path': model_path,
-        'animation_frame_rate': animation_fps,
         'target_qpos': target_qpos,
         'target_qvel': target_qvel,
-        'num_q': 7
+        'num_q': 7,
+        'base_reward_coeff': 0.3,
+        'imitation_reward_coeffs': (0.65, 0.35)
     }
 )

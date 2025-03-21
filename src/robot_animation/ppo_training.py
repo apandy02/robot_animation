@@ -37,39 +37,9 @@ def main() -> int:
         wandb_callback = None
 
         if args.track:
-            # Create CARBS sweep
-            """
-            # carbs stuff (frozen for now)
-            sweep_id = create_sweep(
-                sweep_name='PPO Robot Animation',
-                wandb_entity='aryaman-pandya-99',
-                wandb_project='robot-animation',
-                carb_params=param_spaces
-            )
-            print(f"Sweep ID: {sweep_id}")"""
             run, wandb_callback = setup_wandb(args.env, args.n_envs, args.timesteps)
             print(f"Run ID: {run.id}")
             
-            # Create plots directory if it doesn't exist
-            plots_dir = os.path.join(os.path.dirname(__file__), "../../plots")
-            os.makedirs(plots_dir, exist_ok=True)
-            
-            """
-            carbs stuff (frozen for now)
-            carbs_params = CARBSParams(
-                # better_direction_sign=1,
-                is_wandb_logging_enabled=False,
-                # wandb_params=WandbLoggingParams(
-                #     run_id=run.id,
-                #     run_name=run.name,
-                #     group_name=run.group,
-                #     project_name=run.project,
-                #     root_dir=plots_dir
-                # )
-            )
-            carbs = CARBS(config=carbs_params, params=param_spaces)
-            wandb_carbs = WandbCarbs(carbs=carbs)
-            suggestion = wandb_carbs.suggest()"""
         
         animation_df = process_raw_robot_data(args.csv_path)
         target_qpos, _ = robot_data_to_qpos_qvel(animation_df, num_q=7)
@@ -92,7 +62,6 @@ def main() -> int:
                 n_envs=args.n_envs,
                 vec_env_cls=DummyVecEnv
             )
-        # Use CARBS suggestions if tracking
         model_kwargs = {
             "policy": "MlpPolicy",
             "env": env,
@@ -128,15 +97,6 @@ def main() -> int:
         eval_env.close()
         
         if run is not None:
-            # Record final performance metrics
-            eval_reward = np.mean([evaluate_episode_reward(model, eval_env) for _ in range(5)])
-            """
-            # carbs stuff (frozen for now)
-            wandb_carbs.record_observation(
-                objective=eval_reward,
-                cost=args.timesteps # Using total timesteps as cost metric
-            )
-            """
             run.finish()
         
         return 0
@@ -174,7 +134,7 @@ def setup_wandb(env: str, n_envs: int, timesteps: int) -> tuple[Run, WandbCallba
     Setup Weights and Biases for experiment tracking.
     """
     run = wandb.init(
-        project="robot-animation",
+        project="robot-animation-v2.1",
         config={
             "algorithm": "PPO",
             "env_id": env,
