@@ -147,7 +147,7 @@ def setup_wandb(env: str, n_envs: int, timesteps: int) -> tuple[Run, WandbCallba
         save_code=True,
     )
     wandb_callback = WandbCallback(
-        model_save_path=MODEL_SAVE_PATH,verbose=2, gradient_save_freq=100,model_save_freq=10000
+        model_save_path=f"{MODEL_SAVE_PATH}/ppo_robot_animation_{run.id}",verbose=2, gradient_save_freq=100,model_save_freq=10000
     )
     return run, wandb_callback
 
