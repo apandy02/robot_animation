@@ -1,9 +1,9 @@
+from abc import ABC, abstractmethod
+
 import numpy as np
 from gymnasium import utils
 from gymnasium.envs.mujoco import MujocoEnv
 from gymnasium.spaces import Box
-
-from abc import ABC, abstractmethod
 
 DEFAULT_CAMERA_CONFIG = {
     "distance": 4.0,

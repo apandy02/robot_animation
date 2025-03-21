@@ -5,7 +5,6 @@ from typing import Callable
 
 import gymnasium as gym
 import numpy as np
-import wandb
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.monitor import Monitor
@@ -13,6 +12,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from wandb.integration.sb3 import WandbCallback
 from wandb.sdk.wandb_run import Run
 
+import wandb
 from robot_animation.data_processing import (
     process_raw_robot_data,
     robot_data_to_qpos_qvel,

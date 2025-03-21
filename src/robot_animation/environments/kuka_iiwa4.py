@@ -1,6 +1,8 @@
 import numpy as np
 from gymnasium.spaces import Box
+
 from .base import RobotAnimationEnv
+
 
 class KukaIIWA4Env(RobotAnimationEnv):
     """
