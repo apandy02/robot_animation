@@ -6,7 +6,9 @@
 # cython: nonecheck=False
 
 import numpy as np
+
 cimport numpy as cnp
+
 
 def compute_gae(cnp.ndarray dones, cnp.ndarray values,
         cnp.ndarray rewards, float gamma, float gae_lambda):

@@ -1,18 +1,16 @@
 # from pdb import set_trace as T
-import time
 import functools
-from collections import deque
 import os
+import time
+from collections import deque
 
-import numpy as np
 import gymnasium
-
+import numpy as np
 import pufferlib.emulation
 import pufferlib.postprocess
 
 import robot_animation.optimized.updated_envs as updated_envs  # noqa  # register the mujoco v5 envs
 
-import os
 os.environ['MUJOCO_GL'] = 'glfw'
 
 

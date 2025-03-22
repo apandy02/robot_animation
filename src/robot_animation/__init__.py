@@ -1,12 +1,10 @@
-from gymnasium.envs.registration import register
-
 import os
 
 import numpy as np
+from gymnasium.envs.registration import register
 
 animation_fps = 153
 
-import numpy as np
 import pandas as pd
 
 

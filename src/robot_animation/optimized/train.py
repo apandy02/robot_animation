@@ -1,23 +1,21 @@
 import argparse
-import tomllib
-import signal
-import random
-import uuid
-import time
 import ast
 import os
+import random
+import signal
+import time
+import tomllib
+import uuid
 
 import pufferlib
+import pufferlib.frameworks.cleanrl
 import pufferlib.utils
 import pufferlib.vector
-import pufferlib.frameworks.cleanrl
-
 from rich.traceback import install
 
 import robot_animation.optimized.clean_pufferl as clean_pufferl
 import robot_animation.optimized.environment as environment
 import robot_animation.optimized.policy as policy
-
 from robot_animation.optimized.utils import init_wandb
 
 # Rich tracebacks
@@ -178,8 +176,9 @@ def train(args, env_creator, policy_cls, rnn_cls, wandb=None, skip_dash=False):
 
 ### CARBS Sweeps
 def sweep_carbs(args, env_name, env_creator, policy_cls, rnn_cls):
+    from utils import carbs_runner_fn, init_carbs
+
     import wandb
-    from utils import init_carbs, carbs_runner_fn
 
     if not os.path.exists("carbs_checkpoints"):
         os.system("mkdir carbs_checkpoints")

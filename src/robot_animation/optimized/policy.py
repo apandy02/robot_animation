@@ -1,12 +1,10 @@
 import numpy as np
-
-import torch
-import torch.nn as nn
-
 import pufferlib
 
 # import pufferlib.models
 import pufferlib.frameworks.cleanrl
+import torch
+import torch.nn as nn
 from pufferlib.pytorch import layer_init
 
 

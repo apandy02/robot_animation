@@ -1,14 +1,16 @@
 import json
 import time
-import numpy as np
 
-from carbs import LinearSpace
-from carbs import LogSpace
-from carbs import LogitSpace
-from carbs import Param
-from carbs import CARBS
-from carbs import CARBSParams
-from carbs import ObservationInParam
+import numpy as np
+from carbs import (
+    CARBS,
+    CARBSParams,
+    LinearSpace,
+    LogitSpace,
+    LogSpace,
+    ObservationInParam,
+    Param,
+)
 
 
 def init_wandb(args_dict, run_name, id=None, resume=True, disable=False):

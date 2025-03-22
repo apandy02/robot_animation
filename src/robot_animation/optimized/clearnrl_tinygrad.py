@@ -1,12 +1,15 @@
 """
 Pytorch stuff first 
 """
+from typing import List, Union
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Union, List
-import numpy as np
 from tinygrad import Tensor
+
+
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     """CleanRL's default layer initialization"""
     torch.nn.init.orthogonal_(layer.weight, std)

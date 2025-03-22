@@ -1,31 +1,29 @@
 # from pdb import set_trace as T
-import numpy as np
-
 import os
 import random
-import psutil
 import time
-
-from threading import Thread
 from collections import defaultdict, deque
+from threading import Thread
 
-from moviepy.editor import ImageSequenceClip
-from PIL import Image, ImageDraw
-from tqdm import tqdm
-
-import rich
-from rich.console import Console
-from rich.table import Table
-
-import torch
-# from tensordict.nn import CudaGraphModule
-
+import numpy as np
+import psutil
 import pufferlib
-import pufferlib.utils
 import pufferlib.pytorch
+import pufferlib.utils
+import rich
+import torch
 
 # Fast Cython GAE implementation
 from c_gae import compute_gae
+from moviepy.editor import ImageSequenceClip
+from PIL import Image, ImageDraw
+from rich.console import Console
+from rich.table import Table
+from tqdm import tqdm
+
+# from tensordict.nn import CudaGraphModule
+
+
 
 torch.set_float32_matmul_precision("high")
 
