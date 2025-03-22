@@ -14,11 +14,11 @@ import pufferlib.frameworks.cleanrl
 
 from rich.traceback import install
 
-import clean_pufferl
-import environment
-import policy
+import robot_animation.optimized.clean_pufferl as clean_pufferl
+import robot_animation.optimized.environment as environment
+import robot_animation.optimized.policy as policy
 
-from utils import init_wandb
+from robot_animation.optimized.utils import init_wandb
 
 # Rich tracebacks
 install(show_locals=False)
@@ -26,6 +26,7 @@ install(show_locals=False)
 # Aggressively exit on ctrl+c
 signal.signal(signal.SIGINT, lambda sig, frame: os._exit(0))
 
+DEFAULT_CONFIG = os.path.abspath(os.path.join(os.path.dirname(__file__), "config/debug.toml"))
 
 def make_policy(env, policy_cls, rnn_cls, args):
     policy = policy_cls(env, **args["policy"])
@@ -42,10 +43,11 @@ def make_policy(env, policy_cls, rnn_cls, args):
     return policy.to(args["train"]["device"])
 
 
-def parse_args(config="config/debug.toml"):
+def parse_args(config=DEFAULT_CONFIG):
     parser = argparse.ArgumentParser(
         description="Training arguments for gymnasium mujoco", add_help=False
     )
+    print(f"Using config: {config}")
     parser.add_argument("-c", "--config", default=config)
     parser.add_argument(
         "-e",

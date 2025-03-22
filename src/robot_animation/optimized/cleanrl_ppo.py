@@ -9,13 +9,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from environment import cleanrl_env_creator
-from policy import CleanRLPolicy
+from robot_animation.optimized.environment import cleanrl_env_creator
+from robot_animation.optimized.policy import CleanRLPolicy
 
 
 if __name__ == "__main__":
-    from utils import init_wandb
-    from train import parse_args
+    from robot_animation.optimized.utils import init_wandb
+    from robot_animation.optimized.train import parse_args
 
     args_dict, env_name = parse_args()
     run_name = f"cleanrl_{env_name}_{args_dict['train']['seed']}_{int(time.time())}"
