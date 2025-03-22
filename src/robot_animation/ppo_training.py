@@ -254,5 +254,5 @@ if __name__ == "__main__":
         exit_code = main()
         sys.exit(exit_code)
     except Exception as e:
-        print(f"Error occurred during execution: {e}", file=sys.stderr)
+        raise e
         sys.exit(1)

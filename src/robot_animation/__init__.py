@@ -127,15 +127,14 @@ target_qpos[:, 3], target_qvel[:, 3] = -target_qpos[:, 3], -target_qvel[:, 3]
 
 register(
     id='RobotAnimationEnv-kuka',
-    entry_point='robot_animation.optimized.environment:single_env_creator',
+    entry_point='robot_animation.optimized.updated_envs.robot_animation:RobotAnimationEnv',
     max_episode_steps=1000,
     kwargs={
-        'env_name': 'RobotAnimationEnv-kuka',
-        'model_path': model_path,
         'animation_frame_rate': animation_fps,
         'target_qpos': target_qpos,
         'target_qvel': target_qvel,
-        'num_q': 7
+        'num_q': 7,
+        'model_path': model_path
     }
 )
 register(
