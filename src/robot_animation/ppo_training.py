@@ -73,8 +73,6 @@ def main() -> int:
             "n_epochs": 5,
             "n_steps": 1024
         }
-
-        breakpoint()
         model = PPO(**model_kwargs)
         if args.track:
             model.learn(total_timesteps=args.timesteps, callback=wandb_callback)
