@@ -10,3 +10,4 @@ wandb/*
 *.icloud
 checkpoints/*
 *.zip
+.DS_Store

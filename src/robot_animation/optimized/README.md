@@ -1,0 +1,5 @@
+# mujoco-trainer
+
+setup: 
+
+brew 

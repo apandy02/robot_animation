@@ -37,7 +37,7 @@ def main() -> int:
         wandb_callback = None
 
         if args.track:
-            run, wandb_callback = setup_wandb(args.env, args.n_envs, args.timesteps)
+            run, wandb_callback = setup_wandb(args.env, args.n_envs, args.timesteps, args.project, args.seed, args.verbose)
             print(f"Run ID: {run.id}")
             
         
@@ -74,7 +74,7 @@ def main() -> int:
             "n_steps": 1024
         }
 
-
+        breakpoint()
         model = PPO(**model_kwargs)
         if args.track:
             model.learn(total_timesteps=args.timesteps, callback=wandb_callback)
@@ -125,16 +125,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--batch_size', type=int, default=16, help='Batch size for training')
     parser.add_argument('--track', action='store_true', help='Whether to track with wandb')
     parser.add_argument('--multi_proc', action='store_true', help='Whether to use multiple processes for training')
-    
+    parser.add_argument('--project', type=str, default="robot-animation-v2.1", help='Wandb project name')
+    parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
+    parser.add_argument('-v', '--verbose', type=int, default=2, help='Verbose output')
     return parser.parse_args()
 
 
-def setup_wandb(env: str, n_envs: int, timesteps: int) -> tuple[Run, WandbCallback]:
+def setup_wandb(env: str, n_envs: int, timesteps: int, project_name: str, verbose: int) -> tuple[Run, WandbCallback]:
     """
     Setup Weights and Biases for experiment tracking.
     """
     run = wandb.init(
-        project="robot-animation-v2.1",
+        project=project_name,
         config={
             "algorithm": "PPO",
             "env_id": env,
@@ -147,7 +149,10 @@ def setup_wandb(env: str, n_envs: int, timesteps: int) -> tuple[Run, WandbCallba
         save_code=True,
     )
     wandb_callback = WandbCallback(
-        model_save_path=f"{MODEL_SAVE_PATH}/ppo_robot_animation_{run.id}",verbose=2, gradient_save_freq=100,model_save_freq=10000
+        model_save_path=f"{MODEL_SAVE_PATH}/ppo_robot_animation_{run.id}",
+        verbose=verbose,
+        gradient_save_freq=100,
+        model_save_freq=10000
     )
     return run, wandb_callback
 
@@ -245,5 +250,9 @@ def evaluate_episode_reward(model: PPO, env: gym.Env) -> float:
 
 
 if __name__ == "__main__":
-    exit_code = main()
-    sys.exit(exit_code)
+    try:
+        exit_code = main()
+        sys.exit(exit_code)
+    except Exception as e:
+        print(f"Error occurred during execution: {e}", file=sys.stderr)
+        sys.exit(1)
