@@ -2,10 +2,11 @@ import os
 
 import numpy as np
 from gymnasium.envs.registration import register
+import pandas as pd
 
 animation_fps = 153
 
-import pandas as pd
+
 
 
 def robot_data_to_qpos_qvel(animation_df: pd.DataFrame, num_q: int) -> tuple[np.ndarray, np.ndarray]:
