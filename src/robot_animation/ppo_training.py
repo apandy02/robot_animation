@@ -6,21 +6,12 @@ from typing import Callable
 import gymnasium as gym
 import numpy as np
 import wandb
-from carbs import (  # noqa - not using carbs for now
-    CARBS,
-    CARBSParams,
-    LinearSpace,
-    LogSpace,
-    Param,
-    WandbLoggingParams,
-)
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from wandb.integration.sb3 import WandbCallback
 from wandb.sdk.wandb_run import Run
-from wandb_carbs import WandbCarbs, create_sweep  # noqa - not using carbs for now
 
 from robot_animation.data_processing import (
     process_raw_robot_data,
@@ -44,14 +35,6 @@ def main() -> int:
         args = parse_args()
         run = None
         wandb_callback = None
-
-        # Define CARBS parameter spaces
-        param_spaces = [
-            Param(name='learning_rate', space=LogSpace(min=1e-5, max=1e-3), search_center=1e-4),
-            Param(name='batch_size', space=LinearSpace(min=8, max=64, is_integer=True), search_center=32),
-            Param(name='n_epochs', space=LinearSpace(min=3, max=10, is_integer=True), search_center=6),
-            Param(name='n_steps', space=LinearSpace(min=512, max=2048, is_integer=True), search_center=1024)
-        ]
 
         if args.track:
             # Create CARBS sweep
