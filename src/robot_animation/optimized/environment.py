@@ -10,7 +10,7 @@ import gymnasium
 import pufferlib.emulation
 import pufferlib.postprocess
 
-import updated_envs  # noqa  # register the mujoco v5 envs
+import robot_animation.optimized.updated_envs as updated_envs  # noqa  # register the mujoco v5 envs
 
 import os
 os.environ['MUJOCO_GL'] = 'glfw'
