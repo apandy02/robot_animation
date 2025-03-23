@@ -9,8 +9,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from robot_animation.puffer.puffer_environment import cleanrl_env_creator
 from robot_animation.puffer.policy import CleanRLPolicy
+from robot_animation.puffer.puffer_environment import cleanrl_env_creator
 
 if __name__ == "__main__":
     from robot_animation.puffer.train import parse_args

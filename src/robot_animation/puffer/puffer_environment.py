@@ -9,7 +9,7 @@ import numpy as np
 import pufferlib.emulation
 import pufferlib.postprocess
 
-import robot_animation.environments.kuka_iiwa4 # noqa  # register the mujoco v5 envs
+import robot_animation.environments.kuka_iiwa4  # noqa  # register the mujoco v5 envs
 
 os.environ['MUJOCO_GL'] = 'glfw'
 

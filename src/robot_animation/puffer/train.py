@@ -14,8 +14,8 @@ import pufferlib.vector
 from rich.traceback import install
 
 import robot_animation.puffer.clean_pufferl as clean_pufferl
-import robot_animation.puffer.puffer_environment as puffer_environment
 import robot_animation.puffer.policy as policy
+import robot_animation.puffer.puffer_environment as puffer_environment
 from robot_animation.puffer.utils import init_wandb
 
 # Rich tracebacks
