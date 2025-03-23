@@ -11,13 +11,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from tinygrad import Tensor
 
-
-def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
-    """CleanRL's default layer initialization"""
-    torch.nn.init.orthogonal_(layer.weight, std)
-    torch.nn.init.constant_(layer.bias, bias_const)
-    return layer
-
 # This replaces gymnasium's NormalizeObservation wrapper
 # NOTE: Tried BatchNorm1d with momentum=None, but the policy did not learn. Check again later.
 class RunningNorm(nn.Module):
@@ -216,7 +209,44 @@ class CleanRLPolicy(Policy):
 Next, we will one by one translate the torch code to tinygrad
 """
 
+
+def layer_init(layer: nn.Linear, std=np.sqrt(2), bias_const=0.0):
+    """CleanRL's default layer initialization"""
+    layer.weight = tiny_orthogonal_(layer.weight, std)
+    layer.bias = tiny_constant_(layer.bias, bias_const)
+    return layer
+
+from tinygrad import nn 
 def tiny_orthogonal_(tensor: Tensor, gain=1, generator=None):
+    """
+    NOTE: Since initialization occurs only once, we are being lazy and using numpy linear algebra to perform certain operations.
+    """
+    if tensor.ndim < 2:
+        raise ValueError("Only tensors with 2 or more dimensions are supported")
 
+    if tensor.numel() == 0:
+        return tensor # no-op for empty tensors
 
+    rows, cols = tensor.shape[0], tensor.numel() // tensor.shape[0]
+    flattened = Tensor.randn(rows, cols) # figure out if it has the same device configs as the input tensor
+
+    if rows < cols:
+        flattened = flattened.transpose()
+
+    # for now, we use numpy to compute the qr factorization
+    q, r = np.linalg.qr(flattened.numpy())
+
+    d = np.diag(r, 0)
+    ph = np.sign(d)
+    q *= ph
+
+    if rows < cols:
+        q.transpose()
+
+    return Tensor(q).mul(gain)
+
+def tiny_constant_(tensor: Tensor, val: float):
+    """
+    """
+    return Tensor.ones(tensor.shape) * val
 
