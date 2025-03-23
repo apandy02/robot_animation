@@ -176,7 +176,7 @@ def train(args, env_creator, policy_cls, rnn_cls, wandb=None, skip_dash=False):
 
 ### CARBS Sweeps
 def sweep_carbs(args, env_name, env_creator, policy_cls, rnn_cls):
-    from utils import carbs_runner_fn, init_carbs
+    from robot_animation.puffer.utils import carbs_runner_fn, init_carbs
 
     import wandb
 
