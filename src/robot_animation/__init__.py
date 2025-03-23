@@ -7,8 +7,6 @@ import pandas as pd
 animation_fps = 153
 
 
-
-
 def robot_data_to_qpos_qvel(animation_df: pd.DataFrame, num_q: int) -> tuple[np.ndarray, np.ndarray]:
     """
     Convert raw robot data from animation to qpos and qvel
@@ -126,7 +124,7 @@ target_qpos[:, 3], target_qvel[:, 3] = -target_qpos[:, 3], -target_qvel[:, 3]
 
 register(
     id='RobotAnimationEnv-kuka',
-    entry_point='robot_animation.optimized.updated_envs.robot_animation:RobotAnimationEnv',
+    entry_point='robot_animation.environments.kuka_iiwa4:KukaIIWA4Env',
     max_episode_steps=1000,
     kwargs={
         'animation_frame_rate': animation_fps,
@@ -136,16 +134,3 @@ register(
         'model_path': model_path
     }
 )
-register(
-    id="Ant-v5",
-    entry_point="robot_animation.optimized.updated_envs.ant_v5:AntEnv",
-    max_episode_steps=1000,
-    reward_threshold=6000.0,
-)
-
-register(
-    id="Humanoid-v5",
-    entry_point="robot_animation.optimized.updated_envs.humanoid_v5:HumanoidEnv",
-    max_episode_steps=1000,
-)
-
