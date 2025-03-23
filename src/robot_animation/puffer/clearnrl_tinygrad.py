@@ -1,4 +1,6 @@
 """
+CleanRL PPO implementation in TinyGrad [In Progress]
+
 Pytorch stuff first 
 """
 from typing import List, Union
