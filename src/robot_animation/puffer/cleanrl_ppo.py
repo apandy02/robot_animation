@@ -9,12 +9,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from robot_animation.optimized.environment import cleanrl_env_creator
-from robot_animation.optimized.policy import CleanRLPolicy
+from robot_animation.puffer.puffer_environment import cleanrl_env_creator
+from robot_animation.puffer.policy import CleanRLPolicy
 
 if __name__ == "__main__":
-    from robot_animation.optimized.train import parse_args
-    from robot_animation.optimized.utils import init_wandb
+    from robot_animation.puffer.train import parse_args
+    from robot_animation.puffer.utils import init_wandb
 
     args_dict, env_name = parse_args()
     run_name = f"cleanrl_{env_name}_{args_dict['train']['seed']}_{int(time.time())}"
@@ -69,8 +69,6 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
-    # env setup
-    breakpoint()
     envs = gymnasium.vector.SyncVectorEnv(
         [
             cleanrl_env_creator(args.env_id, args.capture_video, args.gamma, i)

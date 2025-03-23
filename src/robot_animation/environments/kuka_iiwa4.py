@@ -16,7 +16,7 @@ class KukaIIWA4Env(RobotAnimationEnv):
         target_qvel: np.ndarray,
         model_path,
         reset_noise_scale: float = 0.1,
-        render_mode: str = "human",
+        render_mode: str = "rgb_array",
         base_reward_coeff: float = 0.3,
         num_q: int = 7,
         imitation_reward_coeffs: tuple[float, float] = (0.65, 0.35),
