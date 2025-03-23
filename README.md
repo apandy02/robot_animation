@@ -69,12 +69,22 @@ robot_animation/
    uv run wandb login
    ```
 
-## Running the Project
+## Running PPO Training
+
+### Using Stable Baselines3
 
 To train the robot using PPO:
 
 ```bash
-uv run src/robot_animation/ppo_training.py
+uv run src/robot_animation/train_ppo_sb3.py --total-timesteps 100000
+```
+
+### Using Puffer
+
+To train the robot using Puffer:
+
+```bash
+uv run src/robot_animation/puffer/train_ppo_puffer.py --train.total-timesteps 100000
 ```
 
 ## Linting and Formatting
@@ -84,11 +94,4 @@ To run the linter and formatter:
 ```bash
 uvx isort .
 uvx ruff check . --fix
-```
-
-## Debug
-
-```bash
-sudo apt-get update
-sudo apt-get install libgl1-mesa-glx
 ```

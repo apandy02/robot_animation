@@ -5,7 +5,6 @@ from typing import Callable
 
 import gymnasium as gym
 import numpy as np
-import wandb
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.monitor import Monitor
@@ -13,6 +12,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from wandb.integration.sb3 import WandbCallback
 from wandb.sdk.wandb_run import Run
 
+import wandb
 from robot_animation.data_processing import (
     process_raw_robot_data,
     robot_data_to_qpos_qvel,
@@ -37,39 +37,9 @@ def main() -> int:
         wandb_callback = None
 
         if args.track:
-            # Create CARBS sweep
-            """
-            # carbs stuff (frozen for now)
-            sweep_id = create_sweep(
-                sweep_name='PPO Robot Animation',
-                wandb_entity='aryaman-pandya-99',
-                wandb_project='robot-animation',
-                carb_params=param_spaces
-            )
-            print(f"Sweep ID: {sweep_id}")"""
-            run, wandb_callback = setup_wandb(args.env, args.n_envs, args.timesteps)
+            run, wandb_callback = setup_wandb(args.env, args.n_envs, args.timesteps, args.project, args.seed, args.verbose)
             print(f"Run ID: {run.id}")
             
-            # Create plots directory if it doesn't exist
-            plots_dir = os.path.join(os.path.dirname(__file__), "../../plots")
-            os.makedirs(plots_dir, exist_ok=True)
-            
-            """
-            carbs stuff (frozen for now)
-            carbs_params = CARBSParams(
-                # better_direction_sign=1,
-                is_wandb_logging_enabled=False,
-                # wandb_params=WandbLoggingParams(
-                #     run_id=run.id,
-                #     run_name=run.name,
-                #     group_name=run.group,
-                #     project_name=run.project,
-                #     root_dir=plots_dir
-                # )
-            )
-            carbs = CARBS(config=carbs_params, params=param_spaces)
-            wandb_carbs = WandbCarbs(carbs=carbs)
-            suggestion = wandb_carbs.suggest()"""
         
         animation_df = process_raw_robot_data(args.csv_path)
         target_qpos, _ = robot_data_to_qpos_qvel(animation_df, num_q=7)
@@ -92,7 +62,6 @@ def main() -> int:
                 n_envs=args.n_envs,
                 vec_env_cls=DummyVecEnv
             )
-        # Use CARBS suggestions if tracking
         model_kwargs = {
             "policy": "MlpPolicy",
             "env": env,
@@ -104,8 +73,6 @@ def main() -> int:
             "n_epochs": 5,
             "n_steps": 1024
         }
-
-
         model = PPO(**model_kwargs)
         if args.track:
             model.learn(total_timesteps=args.timesteps, callback=wandb_callback)
@@ -128,15 +95,6 @@ def main() -> int:
         eval_env.close()
         
         if run is not None:
-            # Record final performance metrics
-            eval_reward = np.mean([evaluate_episode_reward(model, eval_env) for _ in range(5)])
-            """
-            # carbs stuff (frozen for now)
-            wandb_carbs.record_observation(
-                objective=eval_reward,
-                cost=args.timesteps # Using total timesteps as cost metric
-            )
-            """
             run.finish()
         
         return 0
@@ -165,16 +123,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--batch_size', type=int, default=16, help='Batch size for training')
     parser.add_argument('--track', action='store_true', help='Whether to track with wandb')
     parser.add_argument('--multi_proc', action='store_true', help='Whether to use multiple processes for training')
-    
+    parser.add_argument('--project', type=str, default="robot-animation-v2.1", help='Wandb project name')
+    parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
+    parser.add_argument('-v', '--verbose', type=int, default=2, help='Verbose output')
     return parser.parse_args()
 
 
-def setup_wandb(env: str, n_envs: int, timesteps: int) -> tuple[Run, WandbCallback]:
+def setup_wandb(env: str, n_envs: int, timesteps: int, project_name: str, verbose: int) -> tuple[Run, WandbCallback]:
     """
     Setup Weights and Biases for experiment tracking.
     """
     run = wandb.init(
-        project="robot-animation",
+        project=project_name,
         config={
             "algorithm": "PPO",
             "env_id": env,
@@ -187,7 +147,10 @@ def setup_wandb(env: str, n_envs: int, timesteps: int) -> tuple[Run, WandbCallba
         save_code=True,
     )
     wandb_callback = WandbCallback(
-        model_save_path=MODEL_SAVE_PATH,verbose=2, gradient_save_freq=100,model_save_freq=10000
+        model_save_path=f"{MODEL_SAVE_PATH}/ppo_robot_animation_{run.id}",
+        verbose=verbose,
+        gradient_save_freq=100,
+        model_save_freq=10000
     )
     return run, wandb_callback
 
@@ -285,5 +248,9 @@ def evaluate_episode_reward(model: PPO, env: gym.Env) -> float:
 
 
 if __name__ == "__main__":
-    exit_code = main()
-    sys.exit(exit_code)
+    try:
+        exit_code = main()
+        sys.exit(exit_code)
+    except Exception as e:
+        raise e
+        sys.exit(1)
