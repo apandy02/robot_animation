@@ -11,11 +11,66 @@ import torch
 from tinygrad import Tensor, dtypes, nn
 
 
+def entropy(logits: Tensor) -> Tensor:
+    min_real = dtypes.min(logits.dtype)
+    logits = logits.clamp(min_=min_real)
+    p_log_p = logits * logits_to_probs(logits)
+    return -p_log_p.sum(-1)
+
+def log_prob(logits, value):
+    value = value.long().unsqueeze(-1)
+    value, log_pmf = torch.broadcast_tensors(value, logits)
+    value = value[..., :1]
+    return log_pmf.gather(-1, value).squeeze(-1)
+
+def logits_to_probs(logits: Tensor, is_binary: bool = False):
+    if is_binary:
+        return logits.sigmoid()
+    return logits.softmax()
+
+# TODO: rewrite in tinygrad. Leaving this as a placeholder here since we are only using the cleanrl policy
+def sample_logits(
+    logits: Union[Tensor, List[Tensor]],
+    action=None,
+    is_continuous=False
+) -> Tuple[Tensor, Tensor, Tensor]:
+    is_discrete = isinstance(logits, Tensor)
+    if is_continuous:
+        batch = logits.loc.shape[0]
+        if action is None:
+            action = logits.sample().view(batch, -1)
+
+        log_probs = logits.log_prob(action.view(batch, -1)).sum(1)
+        logits_entropy = logits.entropy().view(batch, -1).sum(1)
+        return action, log_probs, logits_entropy
+    elif is_discrete:
+        normalized_logits = [logits - logits.logsumexp(dim=-1, keepdim=True)]
+        logits = [logits]
+    else: # not sure what else it could be
+        normalized_logits = [l - l.logsumexp(dim=-1, keepdim=True) for l in logits]
+    
+    if action is None:
+        action = torch.stack([torch.multinomial(logits_to_probs(l), 1).squeeze() for l in logits])
+    else:
+        batch = logits[0].shape[0]
+        action = action.view(batch, -1).T
+
+    assert len(logits) == len(action)
+    logprob = torch.stack([log_prob(l, a) for l, a in zip(normalized_logits, action)]).T.sum(1)
+    logits_entropy = torch.stack([entropy(l) for l in normalized_logits]).T.sum(1)
+
+    if is_discrete:
+        return action.squeeze(0), logprob.squeeze(0), logits_entropy.squeeze(0)
+
+    return action.T, logprob, logits_entropy
+
+
 def layer_init(layer: nn.Linear, std=np.sqrt(2), bias_const=0.0):
     """CleanRL's default layer initialization"""
     layer.weight = tiny_orthogonal_(layer.weight, std)
     layer.bias = tiny_constant_(layer.bias, bias_const)
     return layer
+
 
 def tiny_orthogonal_(tensor: Tensor, gain=1, generator=None):
     """
@@ -43,6 +98,7 @@ def tiny_orthogonal_(tensor: Tensor, gain=1, generator=None):
         q.transpose()
 
     return Tensor(q).mul(gain)
+
 
 def tiny_constant_(tensor: Tensor, val: float):
     """
@@ -86,29 +142,7 @@ class TinyPolicy:
         logits, value = self.policy(x)
         action, logprob, entropy = sample_logits(logits, action, self.is_continuous)
         return action, logprob, entropy, value
-
-
-
-class Critic:
-    def __init__(self, obs_size, hidden_size):
-        self.l1 = layer_init(nn.Linear(obs_size, hidden_size))
-        self.l2 = layer_init(nn.Linear(hidden_size, hidden_size))
-        self.l3 = layer_init(nn.Linear(hidden_size, 1))
-
-    def __call__(self, x: Tensor):
-        x = self.l1(x).tanh()
-        x = self.l2(x).tanh()
-        return self.l3(x)
-
-class ActorEncoder:
-    def __init__(self, obs_size, hidden_size):
-        self.l1 = layer_init(nn.Linear(obs_size, hidden_size))
-        self.l2 = layer_init(nn.Linear(hidden_size, hidden_size))
-
-    def __call__(self, x: Tensor):
-        x = self.l1(x).tanh()
-        return self.l2(x).tanh()
-
+    
 class TinyCleanRLPolicy(TinyPolicy):
     def __init__(self, envs, hidden_size=64):
         super().__init__(policy=None)  # Just to get the right init
@@ -149,108 +183,23 @@ class TinyCleanRLPolicy(TinyPolicy):
     #  def update_obs_stats(self, x):
     #      self.obs_norm.update(x)
 
-def entropy(logits: Tensor) -> Tensor:
-    min_real = dtypes.min(logits.dtype)
-    logits = logits.clamp(min_=min_real)
-    p_log_p = logits * logits_to_probs(logits)
-    return -p_log_p.sum(-1)
 
-def log_prob(logits, value):
-    value = value.long().unsqueeze(-1)
-    value, log_pmf = torch.broadcast_tensors(value, logits)
-    value = value[..., :1]
-    return log_pmf.gather(-1, value).squeeze(-1)
+class Critic:
+    def __init__(self, obs_size, hidden_size):
+        self.l1 = layer_init(nn.Linear(obs_size, hidden_size))
+        self.l2 = layer_init(nn.Linear(hidden_size, hidden_size))
+        self.l3 = layer_init(nn.Linear(hidden_size, 1))
 
-def logits_to_probs(logits: Tensor, is_binary: bool = False):
-    if is_binary:
-        return logits.sigmoid()
-    return logits.softmax()
+    def __call__(self, x: Tensor):
+        x = self.l1(x).tanh()
+        x = self.l2(x).tanh()
+        return self.l3(x)
 
-def sample_logits(
-    logits: Union[Tensor, List[Tensor]],
-    action=None,
-    is_continuous=False
-) -> Tuple[Tensor, Tensor, Tensor]:
-    is_discrete = isinstance(logits, Tensor)
-    if is_continuous:
-        batch = logits.loc.shape[0]
-        if action is None:
-            action = logits.sample().view(batch, -1)
+class ActorEncoder:
+    def __init__(self, obs_size, hidden_size):
+        self.l1 = layer_init(nn.Linear(obs_size, hidden_size))
+        self.l2 = layer_init(nn.Linear(hidden_size, hidden_size))
 
-        log_probs = logits.log_prob(action.view(batch, -1)).sum(1)
-        logits_entropy = logits.entropy().view(batch, -1).sum(1)
-        return action, log_probs, logits_entropy
-    elif is_discrete:
-        normalized_logits = [logits - logits.logsumexp(dim=-1, keepdim=True)]
-        logits = [logits]
-    else: # not sure what else it could be
-        normalized_logits = [l - l.logsumexp(dim=-1, keepdim=True) for l in logits]
-    
-    if action is None:
-        action = torch.stack([torch.multinomial(logits_to_probs(l), 1).squeeze() for l in logits])
-    else:
-        batch = logits[0].shape[0]
-        action = action.view(batch, -1).T
-
-    assert len(logits) == len(action)
-    logprob = torch.stack([log_prob(l, a) for l, a in zip(normalized_logits, action)]).T.sum(1)
-    logits_entropy = torch.stack([entropy(l) for l in normalized_logits]).T.sum(1)
-
-    if is_discrete:
-        return action.squeeze(0), logprob.squeeze(0), logits_entropy.squeeze(0)
-
-    return action.T, logprob, logits_entropy
-
-
-# This replaces gymnasium's NormalizeObservation wrapper
-# NOTE: Tried BatchNorm1d with momentum=None, but the policy did not learn. Check again later.
-class RunningNorm(nn.Module):
-    def __init__(self, shape: int, epsilon=1e-5, clip=10.0):
-        super().__init__()
-        self.register_buffer("running_mean", torch.zeros((1, shape), dtype=torch.float32))
-        self.register_buffer("running_var", torch.ones((1, shape), dtype=torch.float32))
-        self.register_buffer("count", torch.ones(1, dtype=torch.float32))
-        self.epsilon = epsilon
-        self.clip = clip
-
-    def forward(self, x):
-        return torch.clamp(
-            (x - self.running_mean.expand_as(x))
-            / torch.sqrt(self.running_var.expand_as(x) + self.epsilon),
-            -self.clip,
-            self.clip,
-        )
-
-    @torch.jit.ignore
-    def update(self, x):
-        # NOTE: Separated update from forward to compile the policy
-        # update() must be called to update the running mean and var
-        if self.training:
-            with torch.no_grad():
-                x = x.float()
-                assert x.dim() == 2, "x must be 2D"
-                mean = x.mean(0, keepdim=True)
-                var = x.var(0, unbiased=False, keepdim=True)
-                weight = 1 / self.count
-                self.running_mean = self.running_mean * (1 - weight) + mean * weight
-                self.running_var = self.running_var * (1 - weight) + var * weight
-                self.count += 1
-
-    # NOTE: below are needed to torch.save() the model
-    @torch.jit.ignore
-    def __getstate__(self):
-        return {
-            "running_mean": self.running_mean,
-            "running_var": self.running_var,
-            "count": self.count,
-            "epsilon": self.epsilon,
-            "clip": self.clip,
-        }
-
-    @torch.jit.ignore
-    def __setstate__(self, state):
-        self.running_mean = state["running_mean"]
-        self.running_var = state["running_var"]
-        self.count = state["count"]
-        self.epsilon = state["epsilon"]
-        self.clip = state["clip"]
+    def __call__(self, x: Tensor):
+        x = self.l1(x).tanh()
+        return self.l2(x).tanh()
