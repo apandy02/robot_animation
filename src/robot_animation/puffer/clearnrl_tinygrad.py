@@ -147,10 +147,8 @@ class TinyCleanRLPolicy(TinyPolicy):
     def __init__(self, envs, hidden_size=64):
         super().__init__(policy=None)  # Just to get the right init
         self.is_continuous = True
-        # self.obs_size = np.array(envs.single_observation_space.shape).prod()
-        # action_size = np.prod(envs.single_action_space.shape) # normzlize observations TODO
-        action_size = 1
-        self.obs_size = 1
+        self.obs_size = int(np.array((envs.single_observation_space.shape)).prod())
+        action_size = int(np.array((envs.single_action_space.shape)).prod())
         self.critic = Critic(self.obs_size, hidden_size)
         self.actor_encoder = ActorEncoder(self.obs_size, hidden_size)
         self.actor_decoder_mean = layer_init(nn.Linear(hidden_size, action_size), std=0.01)
