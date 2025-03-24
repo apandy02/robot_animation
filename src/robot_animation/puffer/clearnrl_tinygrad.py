@@ -95,7 +95,7 @@ def tiny_orthogonal_(tensor: Tensor, gain=1, generator=None):
     q *= ph
 
     if rows < cols:
-        q.transpose()
+        q = q.transpose()
 
     return Tensor(q).mul(gain)
 
