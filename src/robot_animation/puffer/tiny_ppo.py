@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import gymnasium
 import numpy as np
-from tinygrad import Tensor, nn, dtypes
+from tinygrad import Tensor, dtypes, nn
 
 from robot_animation.puffer.clearnrl_tinygrad import TinyCleanRLPolicy
 from robot_animation.puffer.puffer_environment import cleanrl_env_creator
