@@ -5,9 +5,8 @@ from types import SimpleNamespace
 
 import gymnasium
 import numpy as np
+from tinygrad import Tensor, nn, dtypes
 
-from robot_animation.puffer.policy import CleanRLPolicy
-from tinygrad import Tensor, nn 
 from robot_animation.puffer.clearnrl_tinygrad import TinyCleanRLPolicy
 from robot_animation.puffer.puffer_environment import cleanrl_env_creator
 
@@ -84,14 +83,14 @@ if __name__ == "__main__":
     actions = Tensor.zeros((args.num_steps, args.num_envs) + envs.single_action_space.shape)
     logprobs = Tensor.zeros((args.num_steps, args.num_envs))
     rewards = Tensor.zeros((args.num_steps, args.num_envs))
-    dones = Tensor.zeros((args.num_steps, args.num_envs))
+    dones = Tensor.zeros((args.num_steps, args.num_envs)).contiguous()
     values = Tensor.zeros((args.num_steps, args.num_envs))
 
     # TRY NOT TO MODIFY: start the game
     global_step = 0
     start_time = time.time()
     next_obs, _ = envs.reset(seed=args.seed)
-    next_obs = Tensor(next_obs)
+    next_obs = Tensor(next_obs, dtype=dtypes.float32)
     next_done = Tensor.zeros(args.num_envs)
 
     for iteration in range(1, args.num_iterations + 1):
