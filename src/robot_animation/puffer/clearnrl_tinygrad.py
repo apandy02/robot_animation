@@ -3,36 +3,13 @@ CleanRL PPO implementation in TinyGrad [In Progress]
 
 Pytorch stuff first 
 """
-from typing import List, Union
+import math
+from typing import List, Tuple, Union
 
 import numpy as np
 import torch
-# import torch.nn as nn
-import torch.nn.functional as F
-from tinygrad import Tensor
+from tinygrad import Tensor, dtypes, nn
 
-class Policy(torch.nn.Module):
-    '''Wrap a non-recurrent PyTorch model for use with CleanRL'''
-    def __init__(self, policy):
-        super().__init__()
-        self.policy = policy
-        self.is_continuous = hasattr(policy, 'is_continuous') and policy.is_continuous
-
-    def get_value(self, x, state=None):
-        _, value = self.policy(x)
-        return value
-
-    def get_action_and_value(self, x, action=None):
-         logits, value = self.policy(x)
-         action, logprob, entropy = sample_logits(logits, action, self.is_continuous)
-         return action, logprob, entropy, value
-
-    def forward(self, x, action=None):
-        return self.get_action_and_value(x, action)
-
-"""
-Next, we will one by one translate the torch code to tinygrad
-"""
 
 def layer_init(layer: nn.Linear, std=np.sqrt(2), bias_const=0.0):
     """CleanRL's default layer initialization"""
@@ -40,10 +17,10 @@ def layer_init(layer: nn.Linear, std=np.sqrt(2), bias_const=0.0):
     layer.bias = tiny_constant_(layer.bias, bias_const)
     return layer
 
-from tinygrad import nn 
 def tiny_orthogonal_(tensor: Tensor, gain=1, generator=None):
     """
     NOTE: Since initialization occurs only once, we are being lazy and using numpy linear algebra to perform certain operations.
+    TODO: try and convert these to native tinygrad ops
     """
     if tensor.ndim < 2:
         raise ValueError("Only tensors with 2 or more dimensions are supported")
@@ -57,9 +34,7 @@ def tiny_orthogonal_(tensor: Tensor, gain=1, generator=None):
     if rows < cols:
         flattened = flattened.transpose()
 
-    # for now, we use numpy to compute the qr factorization
     q, r = np.linalg.qr(flattened.numpy())
-
     d = np.diag(r, 0)
     ph = np.sign(d)
     q *= ph
@@ -73,12 +48,7 @@ def tiny_constant_(tensor: Tensor, val: float):
     """
     """
     return Tensor.ones(tensor.shape) * val
-    
 
-from tinygrad import nn 
-
-import math
-from tinygrad.tensor import Tensor
 
 class NormalDistribution:
     def __init__(self, mean: Tensor, std: Tensor):
@@ -100,11 +70,6 @@ class NormalDistribution:
         return entropy.sum(axis=-1)
 
 
-def logits_to_probs(logits: Tensor, is_binary: bool = False):
-    if is_binary:
-        return logits.sigmoid()
-    return logits.softmax()
-
 class TinyPolicy:
     def __init__(self, policy):
         self.policy = policy
@@ -123,13 +88,12 @@ class TinyPolicy:
         return action, logprob, entropy, value
 
 
-import tinygrad.nn
 
 class Critic:
     def __init__(self, obs_size, hidden_size):
-        self.l1 = layer_init(tinygrad.nn.Linear(obs_size, hidden_size))
-        self.l2 = layer_init(tinygrad.nn.Linear(hidden_size, hidden_size))
-        self.l3 = layer_init(tinygrad.nn.Linear(hidden_size, 1))
+        self.l1 = layer_init(nn.Linear(obs_size, hidden_size))
+        self.l2 = layer_init(nn.Linear(hidden_size, hidden_size))
+        self.l3 = layer_init(nn.Linear(hidden_size, 1))
 
     def __call__(self, x: Tensor):
         x = self.l1(x).tanh()
@@ -138,8 +102,8 @@ class Critic:
 
 class ActorEncoder:
     def __init__(self, obs_size, hidden_size):
-        self.l1 = layer_init(tinygrad.nn.Linear(obs_size, hidden_size))
-        self.l2 = layer_init(tinygrad.nn.Linear(hidden_size, hidden_size))
+        self.l1 = layer_init(nn.Linear(obs_size, hidden_size))
+        self.l2 = layer_init(nn.Linear(hidden_size, hidden_size))
 
     def __call__(self, x: Tensor):
         x = self.l1(x).tanh()
@@ -155,7 +119,7 @@ class TinyCleanRLPolicy(TinyPolicy):
         self.obs_size = 1
         self.critic = Critic(self.obs_size, hidden_size)
         self.actor_encoder = ActorEncoder(self.obs_size, hidden_size)
-        self.actor_decoder_mean = layer_init(tinygrad.nn.Linear(hidden_size, action_size), std=0.01)
+        self.actor_decoder_mean = layer_init(nn.Linear(hidden_size, action_size), std=0.01)
         self.actor_decoder_logstd = Tensor.zeros(1, action_size)
 
     def get_value(self, x):
@@ -185,10 +149,9 @@ class TinyCleanRLPolicy(TinyPolicy):
     #  def update_obs_stats(self, x):
     #      self.obs_norm.update(x)
 
-
-def entropy(logits):
-    min_real = torch.finfo(logits.dtype).min
-    logits = torch.clamp(logits, min=min_real)
+def entropy(logits: Tensor) -> Tensor:
+    min_real = dtypes.min(logits.dtype)
+    logits = logits.clamp(min_=min_real)
     p_log_p = logits * logits_to_probs(logits)
     return -p_log_p.sum(-1)
 
@@ -198,20 +161,17 @@ def log_prob(logits, value):
     value = value[..., :1]
     return log_pmf.gather(-1, value).squeeze(-1)
 
-def logits_to_probs(logits, is_binary=False):
-    r"""
-    Converts a tensor of logits into probabilities. Note that for the
-    binary case, each value denotes log odds, whereas for the
-    multi-dimensional case, the values along the last dimension denote
-    the log probabilities (possibly unnormalized) of the events.
-    """
+def logits_to_probs(logits: Tensor, is_binary: bool = False):
     if is_binary:
-        return torch.sigmoid(logits)
-    return F.softmax(logits, dim=-1)
+        return logits.sigmoid()
+    return logits.softmax()
 
-def sample_logits(logits: Union[torch.Tensor, List[torch.Tensor]],
-        action=None, is_continuous=False):
-    is_discrete = isinstance(logits, torch.Tensor)
+def sample_logits(
+    logits: Union[Tensor, List[Tensor]],
+    action=None,
+    is_continuous=False
+) -> Tuple[Tensor, Tensor, Tensor]:
+    is_discrete = isinstance(logits, Tensor)
     if is_continuous:
         batch = logits.loc.shape[0]
         if action is None:
