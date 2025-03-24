@@ -25,7 +25,6 @@ if __name__ == "__main__":
     args.wandb_group = args_dict["wandb_group"]
     args.track = args_dict["track"]
     args.capture_video = False
-    args.cuda = args_dict["train"]["device"] == "cuda"
     
     # Match SB3 PPO parameters
     args.learning_rate = 3e-4  # From model_kwargs
@@ -34,7 +33,7 @@ if __name__ == "__main__":
     args.update_epochs = 5     # n_epochs from model_kwargs
     args.num_envs = 1         # Single environment
     
-    # These parameters match SB3 defaults: TODO: pass args instead of hardcoding
+    # These parameters match SB3 defaults: TODO: pass these args instead of hardcoding
     args.gamma = 0.99         # discount factor
     args.gae_lambda = 0.95    # GAE lambda parameter
     args.clip_coef = 0.2      # clip_range in SB3
@@ -63,7 +62,7 @@ if __name__ == "__main__":
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
     np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
+    Tensor.manual_seed(args.seed)
 
 
     envs = gymnasium.vector.SyncVectorEnv(
@@ -81,7 +80,7 @@ if __name__ == "__main__":
     optimizer = nn.optim.Adam(nn.state.get_parameters(agent), lr=args.learning_rate, eps=1e-5)
 
     # ALGO Logic: Storage setup
-    obs = Tensor.zeros((args.num_steps, args.num_envs) + envs.single_observation_space.shape)
+    obs = Tensor.zeros((args.num_steps, args.num_envs) + envs.single_observation_space.shape).contiguous()
     actions = Tensor.zeros((args.num_steps, args.num_envs) + envs.single_action_space.shape)
     logprobs = Tensor.zeros((args.num_steps, args.num_envs))
     rewards = Tensor.zeros((args.num_steps, args.num_envs))
@@ -108,9 +107,11 @@ if __name__ == "__main__":
             dones[step] = next_done
 
             # ALGO LOGIC: action logic
-            with torch.no_grad():
-                action, logprob, _, value = agent.get_action_and_value(next_obs)
-                values[step] = value.flatten()
+            Tensor.no_grad = True
+            action, logprob, _, value = agent.get_action_and_value(next_obs)
+            values[step] = value.flatten()
+            Tensor.no_grad = False
+            
             actions[step] = action
             logprobs[step] = logprob
 
@@ -136,22 +137,23 @@ if __name__ == "__main__":
                         episode_stats["last30episode_return"] = info["last30episode_return"]
 
         # bootstrap value if not done
-        with torch.no_grad():
-            next_value = agent.get_value(next_obs).reshape(1, -1)
-            advantages = Tensor.zeros_like(rewards)
-            lastgaelam = 0
-            for t in reversed(range(args.num_steps)):
-                if t == args.num_steps - 1:
-                    nextnonterminal = 1.0 - next_done
-                    nextvalues = next_value
-                else:
-                    nextnonterminal = 1.0 - dones[t + 1]
-                    nextvalues = values[t + 1]
-                delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
-                advantages[t] = lastgaelam = (
-                    delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
-                )
-            returns = advantages + values
+        Tensor.no_grad = True
+        next_value = agent.get_value(next_obs).reshape(1, -1)
+        advantages = Tensor.zeros_like(rewards)
+        lastgaelam = 0
+        for t in reversed(range(args.num_steps)):
+            if t == args.num_steps - 1:
+                nextnonterminal = 1.0 - next_done
+                nextvalues = next_value
+            else:
+                nextnonterminal = 1.0 - dones[t + 1]
+                nextvalues = values[t + 1]
+            delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
+            advantages[t] = lastgaelam = (
+                delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
+            )
+        returns = advantages + values
+        Tensor.no_grad = False
 
         # flatten the batch
         b_obs = obs.reshape((-1,) + envs.single_observation_space.shape)
@@ -176,11 +178,12 @@ if __name__ == "__main__":
                 logratio = newlogprob - b_logprobs[mb_inds]
                 ratio = logratio.exp()
 
-                with torch.no_grad():
-                    # calculate approx_kl http://joschu.net/blog/kl-approx.html
-                    old_approx_kl = (-logratio).mean()
-                    approx_kl = ((ratio - 1) - logratio).mean()
-                    clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
+                Tensor.no_grad = True
+                # calculate approx_kl http://joschu.net/blog/kl-approx.html
+                old_approx_kl = (-logratio).mean()
+                approx_kl = ((ratio - 1) - logratio).mean()
+                clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
+                Tensor.no_grad = False
 
                 mb_advantages = b_advantages[mb_inds]
                 if args.norm_adv:
@@ -190,22 +193,21 @@ if __name__ == "__main__":
 
                 # Policy loss
                 pg_loss1 = -mb_advantages * ratio
-                pg_loss2 = -mb_advantages * torch.clamp(
-                    ratio, 1 - args.clip_coef, 1 + args.clip_coef
-                )
-                pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+                pg_loss2 = -mb_advantages * ratio.clamp(1 - args.clip_coef, 1 + args.clip_coef)
+                pg_loss = pg_loss1.maximum(pg_loss2).mean()
 
                 # Value loss
                 newvalue = newvalue.view(-1)
                 if args.clip_vloss:
-                    v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
-                    v_clipped = b_values[mb_inds] + torch.clamp(
-                        newvalue - b_values[mb_inds],
+                    value_diff = newvalue - b_returns[mb_inds]
+                    v_loss_unclipped = value_diff ** 2
+                    
+                    v_clipped = b_values[mb_inds] + value_diff.clamp(
                         -args.vf_clip_coef,
                         args.vf_clip_coef,
                     )
                     v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
-                    v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
+                    v_loss_max = v_loss_unclipped.maximum(v_loss_clipped)
                     v_loss = 0.5 * v_loss_max.mean()
                 else:
                     v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
