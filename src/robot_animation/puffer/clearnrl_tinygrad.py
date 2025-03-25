@@ -118,12 +118,10 @@ class NormalDistribution:
     def log_prob(self, value: Tensor): # TODO: Double check log_prob formulation
         var = self.std * self.std
         log_scale = self.std.log()
-        log_probs = - ((value - self.mean) ** 2) / (2 * var) - log_scale - 0.5 * math.log(2 * math.pi)
-        return log_probs.sum(axis=-1)
+        return - ((value - self.mean) ** 2) / (2 * var) - log_scale - 0.5 * math.log(2 * math.pi)
 
     def entropy(self): # TODO: Double check entropy formulation
-        entropy = 0.5 + 0.5 * math.log(2 * math.pi) + self.std.log()
-        return entropy.sum(axis=-1)
+        return 0.5 + 0.5 * math.log(2 * math.pi) + self.std.log()
 
 
 class TinyPolicy:
@@ -165,7 +163,7 @@ class TinyCleanRLPolicy(TinyPolicy):
         batch = x.shape[0]
         encoding = self.actor_encoder(x)
         action_mean = self.actor_decoder_mean(encoding)
-        action_logstd = self.actor_decoder_logstd.expand_as(action_mean)
+        action_logstd = self.actor_decoder_logstd.expand(action_mean.shape)
         action_std = action_logstd.exp()
         
         logits = NormalDistribution(action_mean, action_std)
@@ -184,7 +182,7 @@ class TinyCleanRLPolicy(TinyPolicy):
 
 class Critic:
     def __init__(self, obs_size, hidden_size):
-        self.l1 = layer_init(nn.Linear(obs_size, hidden_size))
+        self.l1 = (nn.Linear(obs_size, hidden_size))
         self.l2 = layer_init(nn.Linear(hidden_size, hidden_size))
         self.l3 = layer_init(nn.Linear(hidden_size, 1))
 
