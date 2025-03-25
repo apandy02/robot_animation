@@ -116,9 +116,9 @@ if __name__ == "__main__":
             # ALGO LOGIC: action logic
             with torch.no_grad():
                 action, logprob, _, value = agent.get_action_and_value(next_obs)
-                values[step] = value.flatten()
-            actions[step] = action
-            logprobs[step] = logprob
+                values[step] = value.flatten().detach()
+            actions[step] = action.detach()
+            logprobs[step] = logprob.detach()
 
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy())
@@ -155,7 +155,7 @@ if __name__ == "__main__":
                     nextvalues = values[t + 1]
                 delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
                 advantages[t] = lastgaelam = (
-                    delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
+                    delta.detach() + args.gamma * args.gae_lambda * nextnonterminal.detach() * lastgaelam
                 )
             returns = advantages + values
 

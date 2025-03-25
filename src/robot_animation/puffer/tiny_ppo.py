@@ -16,9 +16,9 @@ from robot_animation.puffer.utils import init_wandb
 @TinyJit
 def get_action_and_value(obs: Tensor, agent: TinyCleanRLPolicy):
     Tensor.no_grad = True
-    action, logprob, _, value = agent.get_action_and_value(obs)
+    action, logprob, _, value = agent(obs)
     Tensor.no_grad = False
-    return action.detach(), logprob.detach(), value.detach()
+    return action, logprob, value
 
 # @TinyJit # TODO: debug duplicate inputs to jit bug 
 def train_step(
@@ -39,20 +39,12 @@ def train_step(
         logratio = newlogprob - logprobs[mb_inds]
         ratio = logratio.exp()
 
-        Tensor.no_grad = True
-        # calculate approx_kl http://joschu.net/blog/kl-approx.html
-        old_approx_kl = (-logratio).mean()
-        approx_kl = ((ratio - 1) - logratio).mean()
-        clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
-        Tensor.no_grad = False
-
         mb_advantages = advantages[mb_inds]
         if args.norm_adv:
             mb_advantages = (mb_advantages - mb_advantages.mean()) / (
                 mb_advantages.std() + 1e-8
             )
 
-        # Policy loss
         pg_loss1 = -mb_advantages * ratio
         pg_loss2 = -mb_advantages * ratio.clamp(1 - args.clip_coef, 1 + args.clip_coef)
         pg_loss = pg_loss1.maximum(pg_loss2).mean()
@@ -80,6 +72,13 @@ def train_step(
         loss.backward()
         # nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm) #TODO: come back to gradient clipping
         optimizer.step()
+
+        Tensor.no_grad = True
+        # calculate approx_kl http://joschu.net/blog/kl-approx.html
+        old_approx_kl = (-logratio).mean()
+        approx_kl = ((ratio - 1) - logratio).mean()
+        clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
+        Tensor.no_grad = False
 
     return pg_loss.realize().item(), v_loss.realize().item(), entropy_loss.realize().item(), old_approx_kl.realize().item(), approx_kl.realize().item()
 
@@ -146,7 +145,6 @@ def main():
 
     # agent = CleanRLPolicy(envs).to(device)
     agent = TinyCleanRLPolicy(envs)
-    breakpoint()
     optimizer = nn.optim.Adam(nn.state.get_parameters(agent), lr=args.learning_rate, eps=1e-5)
     # ALGO Logic: Storage setup
     obs = Tensor.zeros((args.num_steps, args.num_envs) + envs.single_observation_space.shape).contiguous()
