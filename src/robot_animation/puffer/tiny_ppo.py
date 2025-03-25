@@ -20,7 +20,8 @@ def get_action_and_value(obs: Tensor, agent: TinyCleanRLPolicy):
     Tensor.no_grad = False
     return action, logprob, value
 
-# @TinyJit # TODO: debug duplicate inputs to jit bug 
+@Tensor.train()
+@TinyJit
 def train_step(
     mb_inds: list[int],
     obs: Tensor,
@@ -34,51 +35,50 @@ def train_step(
     optimizer: nn.optim.Optimizer,
     clipfracs: list[float]
 ):
-    with Tensor.train():
-        _, newlogprob, entropy, newvalue = agent(obs[mb_inds], actions[mb_inds])
-        logratio = newlogprob - logprobs[mb_inds]
-        ratio = logratio.exp()
+    _, newlogprob, entropy, newvalue = agent(obs[mb_inds], actions[mb_inds])
+    logratio = newlogprob - logprobs[mb_inds]
+    ratio = logratio.exp()
 
-        mb_advantages = advantages[mb_inds]
-        if args.norm_adv:
-            mb_advantages = (mb_advantages - mb_advantages.mean()) / (
-                mb_advantages.std() + 1e-8
-            )
+    mb_advantages = advantages[mb_inds]
+    if args.norm_adv:
+        mb_advantages = (mb_advantages - mb_advantages.mean()) / (
+            mb_advantages.std() + 1e-8
+        )
 
-        pg_loss1 = -mb_advantages * ratio
-        pg_loss2 = -mb_advantages * ratio.clamp(1 - args.clip_coef, 1 + args.clip_coef)
-        pg_loss = pg_loss1.maximum(pg_loss2).mean()
+    pg_loss1 = -mb_advantages * ratio
+    pg_loss2 = -mb_advantages * ratio.clamp(1 - args.clip_coef, 1 + args.clip_coef)
+    pg_loss = pg_loss1.maximum(pg_loss2).mean()
 
-        # Value loss
-        newvalue = newvalue.view(-1)
-        if args.clip_vloss:
-            value_diff = newvalue - returns[mb_inds]
-            v_loss_unclipped = value_diff ** 2
-            
-            v_clipped = values[mb_inds] + value_diff.clamp(
-                -args.vf_clip_coef,
-                args.vf_clip_coef,
-            )
-            v_loss_clipped = (v_clipped - returns[mb_inds]) ** 2
-            v_loss_max = v_loss_unclipped.maximum(v_loss_clipped)
-            v_loss = 0.5 * v_loss_max.mean()
-        else:
-            v_loss = 0.5 * ((newvalue - returns[mb_inds]) ** 2).mean()
+    # Value loss
+    newvalue = newvalue.view(-1)
+    if args.clip_vloss:
+        value_diff = newvalue - returns[mb_inds]
+        v_loss_unclipped = value_diff ** 2
+        
+        v_clipped = values[mb_inds] + value_diff.clamp(
+            -args.vf_clip_coef,
+            args.vf_clip_coef,
+        )
+        v_loss_clipped = (v_clipped - returns[mb_inds]) ** 2
+        v_loss_max = v_loss_unclipped.maximum(v_loss_clipped)
+        v_loss = 0.5 * v_loss_max.mean()
+    else:
+        v_loss = 0.5 * ((newvalue - returns[mb_inds]) ** 2).mean()
 
-        entropy_loss = entropy.mean()
-        loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
+    entropy_loss = entropy.mean()
+    loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
 
-        optimizer.zero_grad()
-        loss.backward()
-        # nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm) #TODO: come back to gradient clipping
-        optimizer.step()
+    optimizer.zero_grad()
+    loss.backward()
+    # nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm) #TODO: come back to gradient clipping
+    optimizer.step()
 
-        Tensor.no_grad = True
-        # calculate approx_kl http://joschu.net/blog/kl-approx.html
-        old_approx_kl = (-logratio).mean()
-        approx_kl = ((ratio - 1) - logratio).mean()
-        clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
-        Tensor.no_grad = False
+    Tensor.no_grad = True
+    # calculate approx_kl http://joschu.net/blog/kl-approx.html
+    old_approx_kl = (-logratio).mean()
+    approx_kl = ((ratio - 1) - logratio).mean()
+    clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
+    Tensor.no_grad = False
 
     return pg_loss.realize().item(), v_loss.realize().item(), entropy_loss.realize().item(), old_approx_kl.realize().item(), approx_kl.realize().item()
 
@@ -221,16 +221,16 @@ def main():
             advantages[t] = lastgaelam = (
                 delta.detach() + args.gamma * args.gae_lambda * nextnonterminal.detach() * lastgaelam
             )[0].realize() #TODO: figure out when to realize
-        returns = advantages + values
+        returns = (advantages + values).detach()
         Tensor.no_grad = False
 
-        # flatten the batch
-        b_obs = obs.reshape((-1,) + envs.single_observation_space.shape)
-        b_logprobs = logprobs.reshape(-1)
-        b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
-        b_advantages = advantages.reshape(-1)
-        b_returns = returns.reshape(-1)
-        b_values = values.reshape(-1)
+        # Create new tensors for the batch
+        b_obs = Tensor(obs.reshape((-1,) + envs.single_observation_space.shape).numpy())
+        b_logprobs = Tensor(logprobs.reshape(-1).numpy())
+        b_actions = Tensor(actions.reshape((-1,) + envs.single_action_space.shape).numpy())
+        b_advantages = Tensor(advantages.reshape(-1).numpy())
+        b_returns = Tensor(returns.reshape(-1).numpy())
+        b_values = Tensor(values.reshape(-1).numpy())
 
         # Optimizing the policy and value network
         b_inds = np.arange(args.batch_size)
