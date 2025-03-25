@@ -14,14 +14,14 @@ from robot_animation.puffer.utils import init_wandb
 
 
 @TinyJit
-def get_action_and_value(obs: Tensor, agent: TinyCleanRLPolicy):
+def get_action_and_value(obs: Tensor, agent: TinyCleanRLPolicy) -> tuple[Tensor, Tensor, Tensor]:
     Tensor.no_grad = True
     action, logprob, _, value = agent(obs)
     Tensor.no_grad = False
     return action, logprob, value
 
-@Tensor.train()
 @TinyJit
+@Tensor.train()
 def train_step(
     mb_inds: list[int],
     obs: Tensor,
@@ -146,20 +146,20 @@ def main():
     # agent = CleanRLPolicy(envs).to(device)
     agent = TinyCleanRLPolicy(envs)
     optimizer = nn.optim.Adam(nn.state.get_parameters(agent), lr=args.learning_rate, eps=1e-5)
-    # ALGO Logic: Storage setup
-    obs = Tensor.zeros((args.num_steps, args.num_envs) + envs.single_observation_space.shape).contiguous()
-    actions = Tensor.zeros((args.num_steps, args.num_envs) + envs.single_action_space.shape).contiguous()
-    logprobs = Tensor.zeros((args.num_steps, args.num_envs)).contiguous()
-    rewards = Tensor.zeros((args.num_steps, args.num_envs)).contiguous()
-    dones = Tensor.zeros((args.num_steps, args.num_envs)).contiguous()
-    values = Tensor.zeros((args.num_steps, args.num_envs)).contiguous()
+    
+    # ALGO Logic: Storage setup using lists
+    obs = []
+    rewards = []
+    dones = []
+    values = []
+    actions = []
+    logprobs = []
 
     # TRY NOT TO MODIFY: start the game
     global_step = 0
     start_time = time.time()
     next_obs, _ = envs.reset(seed=args.seed)
-    next_obs = Tensor(next_obs, dtype=dtypes.float32) # casting as float32 is what is slowing us down
-    next_done = Tensor.zeros(args.num_envs)
+    obs.append(next_obs)
 
     for iteration in range(1, args.num_iterations + 1):
         # Annealing the rate if instructed to do so.
@@ -169,29 +169,33 @@ def main():
             optimizer.param_groups[0]["lr"] = lrnow
         
         get_action_and_value.reset()
+        
+        # Clear buffers at start of each iteration
+        obs.clear()
+        rewards.clear()
+        dones.clear()
+        values.clear()
+
+        next_done = np.array([False] * args.num_envs)
 
         for step in range(0, args.num_steps):
             global_step += args.num_envs
-            obs[step] = next_obs
-            dones[step] = next_done
+            obs.append(next_obs)
+            dones.append(next_done)
 
             # ALGO LOGIC: action logic
             Tensor.no_grad = True
-            action, logprob, value = get_action_and_value(next_obs, agent)
-            values[step] = value.flatten().detach()
+            action, logprob, value = get_action_and_value(Tensor(next_obs, dtype=dtypes.float32), agent)
+            values.append(value.flatten().numpy())
             Tensor.no_grad = False
             
-            actions[step] = action.detach()
-            logprobs[step] = logprob.detach()
+            actions.append(action.numpy()) # detach might be a bottleneck 
+            logprobs.append(logprob.numpy())
 
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, terminations, truncations, infos = envs.step(action.numpy())
             next_done = np.logical_or(terminations, truncations)
-            rewards[step] = Tensor(reward, dtype=dtypes.float32).view(-1)
-            next_obs, next_done = (
-                Tensor(next_obs, dtype=dtypes.float32),
-                Tensor(next_done, dtype=dtypes.float32),
-            )
+            rewards.append(reward.reshape(-1))
 
             if "final_info" in infos:
                 for info in infos["final_info"]:
@@ -205,32 +209,41 @@ def main():
                         episode_stats["normalized_reward"].append(info["normalized_reward"])
                         episode_stats["last30episode_return"] = info["last30episode_return"]
 
+        # Stack tensors from lists
+        obs_tensor = Tensor(np.array(obs), dtype=dtypes.float32)
+        dones_tensor = Tensor(dones)
+        rewards_tensor = Tensor(np.array(rewards), dtype=dtypes.float32)
+        values_tensor = Tensor(np.array(values), dtype=dtypes.float32)
+        next_done = Tensor(next_done, dtype=dtypes.float32) # last termination state
+        logprobs_tensor = Tensor(np.array(logprobs), dtype=dtypes.float32)
+        actions_tensor = Tensor(np.array(actions), dtype=dtypes.float32)
         # bootstrap value if not done
         Tensor.no_grad = True
-        next_value = agent.get_value(next_obs).reshape(1, -1)
-        advantages = Tensor.zeros_like(rewards).contiguous()
+        next_value = agent.get_value(Tensor(next_obs, dtype=dtypes.float32)).reshape(1, -1)
+        advantages = Tensor.zeros_like(rewards_tensor, dtype=dtypes.float32).contiguous()
         lastgaelam = 0
         for t in reversed(range(args.num_steps)):
             if t == args.num_steps - 1:
                 nextnonterminal = 1.0 - next_done
                 nextvalues = next_value
             else:
-                nextnonterminal = 1.0 - dones[t + 1]
-                nextvalues = values[t + 1]
-            delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
+                nextnonterminal = 1.0 - dones_tensor[t + 1]
+                nextvalues = values_tensor[t + 1]
+            
+            delta = rewards_tensor[t] + args.gamma * nextvalues * nextnonterminal - values_tensor[t]
             advantages[t] = lastgaelam = (
                 delta.detach() + args.gamma * args.gae_lambda * nextnonterminal.detach() * lastgaelam
-            )[0].realize() #TODO: figure out when to realize
-        returns = (advantages + values).detach()
+            )[0].realize()
+        returns = (advantages + values_tensor).detach()
         Tensor.no_grad = False
 
-        # Create new tensors for the batch
-        b_obs = Tensor(obs.reshape((-1,) + envs.single_observation_space.shape).numpy())
-        b_logprobs = Tensor(logprobs.reshape(-1).numpy())
-        b_actions = Tensor(actions.reshape((-1,) + envs.single_action_space.shape).numpy())
-        b_advantages = Tensor(advantages.reshape(-1).numpy())
-        b_returns = Tensor(returns.reshape(-1).numpy())
-        b_values = Tensor(values.reshape(-1).numpy())
+        # Reshape tensors for the batch
+        b_obs = obs_tensor.reshape((-1,) + envs.single_observation_space.shape)
+        b_logprobs = logprobs_tensor.reshape(-1)
+        b_actions = actions_tensor.reshape((-1,) + envs.single_action_space.shape)
+        b_advantages = advantages.reshape(-1)
+        b_returns = returns.reshape(-1)
+        b_values = values_tensor.reshape(-1)
 
         # Optimizing the policy and value network
         b_inds = np.arange(args.batch_size)
