@@ -67,7 +67,7 @@ if __name__ == "__main__":
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.torch_deterministic
 
-    device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() and args.cuda else "cpu")
 
     envs = gymnasium.vector.SyncVectorEnv(
         [
@@ -123,10 +123,10 @@ if __name__ == "__main__":
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy())
             next_done = np.logical_or(terminations, truncations)
-            rewards[step] = torch.tensor(reward).to(device).view(-1)
+            rewards[step] = torch.tensor(reward, dtype=torch.float32).to(device).view(-1)
             next_obs, next_done = (
-                torch.Tensor(next_obs).to(device),
-                torch.Tensor(next_done).to(device),
+                torch.tensor(next_obs, dtype=torch.float32).to(device),
+                torch.tensor(next_done, dtype=torch.float32).to(device),
             )
 
             if "final_info" in infos:

@@ -90,7 +90,7 @@ if __name__ == "__main__":
     global_step = 0
     start_time = time.time()
     next_obs, _ = envs.reset(seed=args.seed)
-    next_obs = Tensor(next_obs, dtype=dtypes.float32)
+    next_obs = Tensor(next_obs, dtype=dtypes.float32) # casting as float32 is what is slowing us down
     next_done = Tensor.zeros(args.num_envs)
 
     for iteration in range(1, args.num_iterations + 1):
