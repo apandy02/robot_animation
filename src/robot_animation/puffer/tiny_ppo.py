@@ -5,15 +5,85 @@ from types import SimpleNamespace
 
 import gymnasium
 import numpy as np
-from tinygrad import Tensor, dtypes, nn
+from tinygrad import Tensor, dtypes, nn, TinyJit
 
 from robot_animation.puffer.clearnrl_tinygrad import TinyCleanRLPolicy
 from robot_animation.puffer.puffer_environment import cleanrl_env_creator
 
-if __name__ == "__main__":
-    from robot_animation.puffer.train import parse_args
-    from robot_animation.puffer.utils import init_wandb
+from robot_animation.puffer.train import parse_args
+from robot_animation.puffer.utils import init_wandb
 
+@TinyJit
+def get_action_and_value(obs: Tensor, agent: TinyCleanRLPolicy):
+    Tensor.no_grad = True
+    action, logprob, _, value = agent.get_action_and_value(obs)
+    Tensor.no_grad = False
+    return action.detach(), logprob.detach(), value.detach()
+
+# @TinyJit # TODO: debug duplicate inputs to jit bug 
+def train_step(
+    mb_inds: list[int],
+    obs: Tensor,
+    actions: Tensor,
+    logprobs: Tensor,
+    advantages: Tensor,
+    returns: Tensor,
+    values: Tensor,
+    args: SimpleNamespace,
+    agent: TinyCleanRLPolicy,
+    optimizer: nn.optim.Optimizer,
+    clipfracs: list[float]
+):
+    with Tensor.train():
+        _, newlogprob, entropy, newvalue = agent(obs[mb_inds], actions[mb_inds])
+        logratio = newlogprob - logprobs[mb_inds]
+        ratio = logratio.exp()
+
+        Tensor.no_grad = True
+        # calculate approx_kl http://joschu.net/blog/kl-approx.html
+        old_approx_kl = (-logratio).mean()
+        approx_kl = ((ratio - 1) - logratio).mean()
+        clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
+        Tensor.no_grad = False
+
+        mb_advantages = advantages[mb_inds]
+        if args.norm_adv:
+            mb_advantages = (mb_advantages - mb_advantages.mean()) / (
+                mb_advantages.std() + 1e-8
+            )
+
+        # Policy loss
+        pg_loss1 = -mb_advantages * ratio
+        pg_loss2 = -mb_advantages * ratio.clamp(1 - args.clip_coef, 1 + args.clip_coef)
+        pg_loss = pg_loss1.maximum(pg_loss2).mean()
+
+        # Value loss
+        newvalue = newvalue.view(-1)
+        if args.clip_vloss:
+            value_diff = newvalue - returns[mb_inds]
+            v_loss_unclipped = value_diff ** 2
+            
+            v_clipped = values[mb_inds] + value_diff.clamp(
+                -args.vf_clip_coef,
+                args.vf_clip_coef,
+            )
+            v_loss_clipped = (v_clipped - returns[mb_inds]) ** 2
+            v_loss_max = v_loss_unclipped.maximum(v_loss_clipped)
+            v_loss = 0.5 * v_loss_max.mean()
+        else:
+            v_loss = 0.5 * ((newvalue - returns[mb_inds]) ** 2).mean()
+
+        entropy_loss = entropy.mean()
+        loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
+
+        optimizer.zero_grad()
+        loss.backward()
+        # nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm) #TODO: come back to gradient clipping
+        optimizer.step()
+
+    return pg_loss.realize().item(), v_loss.realize().item(), entropy_loss.realize().item(), old_approx_kl.realize().item(), approx_kl.realize().item()
+
+def main():
     args_dict, env_name = parse_args()
     run_name = f"cleanrl_{env_name}_{args_dict['train']['seed']}_{int(time.time())}"
 
@@ -99,6 +169,8 @@ if __name__ == "__main__":
             frac = 1.0 - (iteration - 1.0) / args.num_iterations
             lrnow = frac * args.learning_rate
             optimizer.param_groups[0]["lr"] = lrnow
+        
+        get_action_and_value.reset()
 
         for step in range(0, args.num_steps):
             global_step += args.num_envs
@@ -107,7 +179,7 @@ if __name__ == "__main__":
 
             # ALGO LOGIC: action logic
             Tensor.no_grad = True
-            action, logprob, _, value = agent.get_action_and_value(next_obs)
+            action, logprob, value = get_action_and_value(next_obs, agent)
             values[step] = value.flatten().detach()
             Tensor.no_grad = False
             
@@ -165,64 +237,16 @@ if __name__ == "__main__":
         # Optimizing the policy and value network
         b_inds = np.arange(args.batch_size)
         clipfracs = []
-        with Tensor.train():
-            for epoch in range(args.update_epochs):
-                np.random.shuffle(b_inds)
-                for start in range(0, args.batch_size, args.minibatch_size):
-                    end = start + args.minibatch_size
-                    mb_inds = b_inds[start:end].tolist()
-                    
-                    _, newlogprob, entropy, newvalue = agent.get_action_and_value(
-                        b_obs[mb_inds], b_actions[mb_inds]
-                    )
-                    logratio = newlogprob - b_logprobs[mb_inds]
-                    ratio = logratio.exp()
-
-                    Tensor.no_grad = True
-                    # calculate approx_kl http://joschu.net/blog/kl-approx.html
-                    old_approx_kl = (-logratio).mean()
-                    approx_kl = ((ratio - 1) - logratio).mean()
-                    clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
-                    Tensor.no_grad = False
-
-                    mb_advantages = b_advantages[mb_inds]
-                    if args.norm_adv:
-                        mb_advantages = (mb_advantages - mb_advantages.mean()) / (
-                            mb_advantages.std() + 1e-8
-                        )
-
-                    # Policy loss
-                    pg_loss1 = -mb_advantages * ratio
-                    pg_loss2 = -mb_advantages * ratio.clamp(1 - args.clip_coef, 1 + args.clip_coef)
-                    pg_loss = pg_loss1.maximum(pg_loss2).mean()
-
-                    # Value loss
-                    newvalue = newvalue.view(-1)
-                    if args.clip_vloss:
-                        value_diff = newvalue - b_returns[mb_inds]
-                        v_loss_unclipped = value_diff ** 2
-                        
-                        v_clipped = b_values[mb_inds] + value_diff.clamp(
-                            -args.vf_clip_coef,
-                            args.vf_clip_coef,
-                        )
-                        v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
-                        v_loss_max = v_loss_unclipped.maximum(v_loss_clipped)
-                        v_loss = 0.5 * v_loss_max.mean()
-                    else:
-                        v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
-
-                    entropy_loss = entropy.mean()
-                    loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
-
-                    optimizer.zero_grad()
-                    loss.backward()
-                    # nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm) #TODO: come back to gradient clipping
-                    breakpoint()
-                    optimizer.step()
-
-                if args.target_kl is not None and approx_kl > args.target_kl:
-                    break
+        for _ in range(args.update_epochs):
+            np.random.shuffle(b_inds)
+            for start in range(0, args.batch_size, args.minibatch_size):
+                end = start + args.minibatch_size
+                mb_inds = b_inds[start:end].tolist()
+                pg_loss, v_loss, entropy_loss, old_approx_kl, approx_kl = train_step(
+                    mb_inds, b_obs, b_actions, b_logprobs, b_advantages, b_returns, b_values, args, agent, optimizer, clipfracs
+                )
+            if args.target_kl is not None and approx_kl > args.target_kl:
+                break
 
         y_pred, y_true = b_values.numpy(), b_returns.numpy()
         var_y = np.var(y_true)
@@ -261,3 +285,7 @@ if __name__ == "__main__":
     envs.close()
     if args.track and wandb is not None:
         wandb.finish()
+
+if __name__ == "__main__":
+    main()
+
