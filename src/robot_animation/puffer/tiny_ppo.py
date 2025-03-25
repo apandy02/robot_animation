@@ -5,13 +5,13 @@ from types import SimpleNamespace
 
 import gymnasium
 import numpy as np
-from tinygrad import Tensor, dtypes, nn, TinyJit
+from tinygrad import Tensor, TinyJit, dtypes, nn
 
 from robot_animation.puffer.clearnrl_tinygrad import TinyCleanRLPolicy
 from robot_animation.puffer.puffer_environment import cleanrl_env_creator
-
 from robot_animation.puffer.train import parse_args
 from robot_animation.puffer.utils import init_wandb
+
 
 @TinyJit
 def get_action_and_value(obs: Tensor, agent: TinyCleanRLPolicy):
