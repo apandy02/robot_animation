@@ -27,6 +27,7 @@ if __name__ == "__main__":
     args.track = args_dict["track"]
     args.capture_video = False
     args.cuda = args_dict["train"]["device"] == "cuda"
+    args.mps = args_dict["train"]["device"] == "mps"
     
     # Match SB3 PPO parameters
     args.learning_rate = 3e-4  # From model_kwargs
@@ -67,7 +68,11 @@ if __name__ == "__main__":
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.torch_deterministic
 
-    device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+    device = torch.device(
+        "cuda" if torch.cuda.is_available() and args.cuda else
+        "mps" if torch.backends.mps.is_available() and args.mps else
+        "cpu"
+    )
 
     envs = gymnasium.vector.SyncVectorEnv(
         [
@@ -116,17 +121,17 @@ if __name__ == "__main__":
             # ALGO LOGIC: action logic
             with torch.no_grad():
                 action, logprob, _, value = agent.get_action_and_value(next_obs)
-                values[step] = value.flatten()
-            actions[step] = action
-            logprobs[step] = logprob
+                values[step] = value.flatten().detach()
+            actions[step] = action.detach()
+            logprobs[step] = logprob.detach()
 
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy())
             next_done = np.logical_or(terminations, truncations)
-            rewards[step] = torch.tensor(reward).to(device).view(-1)
+            rewards[step] = torch.tensor(reward, dtype=torch.float32).to(device).view(-1)
             next_obs, next_done = (
-                torch.Tensor(next_obs).to(device),
-                torch.Tensor(next_done).to(device),
+                torch.tensor(next_obs, dtype=torch.float32).to(device),
+                torch.tensor(next_done, dtype=torch.float32).to(device),
             )
 
             if "final_info" in infos:
@@ -155,7 +160,7 @@ if __name__ == "__main__":
                     nextvalues = values[t + 1]
                 delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
                 advantages[t] = lastgaelam = (
-                    delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
+                    delta.detach() + args.gamma * args.gae_lambda * nextnonterminal.detach() * lastgaelam
                 )
             returns = advantages + values
 
