@@ -175,6 +175,8 @@ def main():
         rewards.clear()
         dones.clear()
         values.clear()
+        actions.clear()
+        logprobs.clear()
 
         next_done = np.array([False] * args.num_envs)
 
@@ -186,14 +188,15 @@ def main():
             # ALGO LOGIC: action logic
             Tensor.no_grad = True
             action, logprob, value = get_action_and_value(Tensor(next_obs, dtype=dtypes.float32), agent)
-            values.append(value.flatten().numpy())
             Tensor.no_grad = False
             
-            actions.append(action.numpy()) # detach might be a bottleneck 
+            values.append(value.flatten().numpy())
+            action_numpy = action.numpy()
+            actions.append(action_numpy)
             logprobs.append(logprob.numpy())
 
             # TRY NOT TO MODIFY: execute the game and log data.
-            next_obs, reward, terminations, truncations, infos = envs.step(action.numpy())
+            next_obs, reward, terminations, truncations, infos = envs.step(action_numpy)
             next_done = np.logical_or(terminations, truncations)
             rewards.append(reward.reshape(-1))
 
@@ -209,40 +212,41 @@ def main():
                         episode_stats["normalized_reward"].append(info["normalized_reward"])
                         episode_stats["last30episode_return"] = info["last30episode_return"]
 
-        # Stack tensors from lists
-        obs_tensor = Tensor(np.array(obs), dtype=dtypes.float32)
-        dones_tensor = Tensor(dones)
-        rewards_tensor = Tensor(np.array(rewards), dtype=dtypes.float32)
-        values_tensor = Tensor(np.array(values), dtype=dtypes.float32)
-        next_done = Tensor(next_done, dtype=dtypes.float32) # last termination state
-        logprobs_tensor = Tensor(np.array(logprobs), dtype=dtypes.float32)
-        actions_tensor = Tensor(np.array(actions), dtype=dtypes.float32)
-        # bootstrap value if not done
         Tensor.no_grad = True
-        next_value = agent.get_value(Tensor(next_obs, dtype=dtypes.float32)).reshape(1, -1)
-        advantages = Tensor.zeros_like(rewards_tensor, dtype=dtypes.float32).contiguous()
+        next_value = (agent.get_value(Tensor(next_obs, dtype=dtypes.float32)).reshape(1, -1)).numpy()
+        advantages = np.zeros_like(rewards)
         lastgaelam = 0
+        dones_array = np.array(dones)
         for t in reversed(range(args.num_steps)):
             if t == args.num_steps - 1:
                 nextnonterminal = 1.0 - next_done
                 nextvalues = next_value
             else:
-                nextnonterminal = 1.0 - dones_tensor[t + 1]
-                nextvalues = values_tensor[t + 1]
+                nextnonterminal = 1.0 - dones_array[t + 1]
+                nextvalues = values[t + 1]
             
-            delta = rewards_tensor[t] + args.gamma * nextvalues * nextnonterminal - values_tensor[t]
+            delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
             advantages[t] = lastgaelam = (
-                delta.detach() + args.gamma * args.gae_lambda * nextnonterminal.detach() * lastgaelam
-            )[0].realize()
-        returns = (advantages + values_tensor).detach()
-        Tensor.no_grad = False
+                delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
+            )
+        returns = (advantages + values)
+        Tensor.no_grad = False # does this need to be here?
+
+        # Stack tensors from lists
+        obs_tensor = Tensor(np.array(obs), dtype=dtypes.float32)
+        values_tensor = Tensor(np.array(values), dtype=dtypes.float32)
+        next_done = Tensor(next_done) # last termination state
+        logprobs_tensor = Tensor(np.array(logprobs), dtype=dtypes.float32)
+        actions_tensor = Tensor(np.array(actions), dtype=dtypes.float32)
+        # bootstrap value if not done
+
 
         # Reshape tensors for the batch
         b_obs = obs_tensor.reshape((-1,) + envs.single_observation_space.shape)
         b_logprobs = logprobs_tensor.reshape(-1)
         b_actions = actions_tensor.reshape((-1,) + envs.single_action_space.shape)
-        b_advantages = advantages.reshape(-1)
-        b_returns = returns.reshape(-1)
+        b_advantages = Tensor(advantages, dtype=dtypes.float32).reshape(-1)
+        b_returns = Tensor(returns, dtype=dtypes.float32).reshape(-1)
         b_values = values_tensor.reshape(-1)
 
         # Optimizing the policy and value network
