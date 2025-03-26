@@ -27,6 +27,7 @@ if __name__ == "__main__":
     args.track = args_dict["track"]
     args.capture_video = False
     args.cuda = args_dict["train"]["device"] == "cuda"
+    args.mps = args_dict["train"]["device"] == "mps"
     
     # Match SB3 PPO parameters
     args.learning_rate = 3e-4  # From model_kwargs
@@ -67,7 +68,11 @@ if __name__ == "__main__":
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.torch_deterministic
 
-    device = torch.device("mps" if torch.backends.mps.is_available() and args.cuda else "cpu")
+    device = torch.device(
+        "cuda" if torch.cuda.is_available() and args.cuda else
+        "mps" if torch.backends.mps.is_available() and args.mps else
+        "cpu"
+    )
 
     envs = gymnasium.vector.SyncVectorEnv(
         [
