@@ -12,6 +12,14 @@ import torch.optim as optim
 from robot_animation.puffer.policy import CleanRLPolicy
 from robot_animation.puffer.puffer_environment import cleanrl_env_creator
 
+import os
+
+SAVE_MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../models/puffer"))
+
+def save_model(model, run_name):
+    model_path = f"{SAVE_MODEL_PATH}/{run_name}.cleanrl_model"
+    torch.save(model.state_dict(), model_path)
+
 if __name__ == "__main__":
     from robot_animation.puffer.train import parse_args
     from robot_animation.puffer.utils import init_wandb
@@ -34,7 +42,6 @@ if __name__ == "__main__":
     args.num_steps = 1024      # n_steps from model_kwargs
     args.batch_size = 8        # batch_size from model_kwargs
     args.update_epochs = 5     # n_epochs from model_kwargs
-    args.num_envs = 1         # Single environment
     
     # These parameters match SB3 defaults: TODO: pass args instead of hardcoding
     args.gamma = 0.99         # discount factor
@@ -264,38 +271,8 @@ if __name__ == "__main__":
         episode_stats["average_reward"].clear()
         episode_stats["normalized_reward"].clear()
 
-    # if args.save_model:
-    #     model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
-    #     torch.save(agent.state_dict(), model_path)
-    #     print(f"model saved to {model_path}")
-    #     from cleanrl_utils.evals.ppo_eval import evaluate
-
-    #     episodic_returns = evaluate(
-    #         model_path,
-    #         make_env,
-    #         args.env_id,
-    #         eval_episodes=10,
-    #         run_name=f"{run_name}-eval",
-    #         Model=Agent,
-    #         device=device,
-    #         gamma=args.gamma,
-    #     )
-    #     for idx, episodic_return in enumerate(episodic_returns):
-    #         writer.add_scalar("eval/episodic_return", episodic_return, idx)
-
-    #     if args.upload_model:
-    #         from cleanrl_utils.huggingface import push_to_hub
-
-    #         repo_name = f"{args.env_id}-{args.exp_name}-seed{args.seed}"
-    #         repo_id = f"{args.hf_entity}/{repo_name}" if args.hf_entity else repo_name
-    #         push_to_hub(
-    #             args,
-    #             episodic_returns,
-    #             repo_id,
-    #             "PPO",
-    #             f"runs/{run_name}",
-    #             f"videos/{run_name}-eval",
-    #         )
+    if args.save_model:
+        save_model(agent, run_name)
 
     envs.close()
     if args.track and wandb is not None:

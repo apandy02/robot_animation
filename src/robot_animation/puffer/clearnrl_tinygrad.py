@@ -116,9 +116,13 @@ class NormalDistribution:
         return self.mean + self.std * noise
 
     def log_prob(self, value: Tensor): # TODO: Double check log_prob formulation
-        var = self.std * self.std
+        var = self.std ** 2
         log_scale = self.std.log()
-        return - ((value - self.mean) ** 2) / (2 * var) - log_scale - 0.5 * math.log(2 * math.pi)
+        return (
+            -((value - self.mean) ** 2) / (2 * var)
+            - log_scale
+            - math.log(math.sqrt(2 * math.pi))
+        )
 
     def entropy(self): # TODO: Double check entropy formulation
         return 0.5 + 0.5 * math.log(2 * math.pi) + self.std.log()
@@ -170,6 +174,7 @@ class TinyCleanRLPolicy(TinyPolicy):
         if action is None:
             action = logits.sample()
         
+        # breakpoint()
         log_probs = logits.log_prob(action.view(batch, -1)).sum(1)
         logits_entropy = logits.entropy().sum(1)
 

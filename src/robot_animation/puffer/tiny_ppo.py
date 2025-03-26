@@ -15,16 +15,12 @@ from robot_animation.puffer.utils import init_wandb
 
 @TinyJit
 def get_action_and_value(obs: Tensor, agent: TinyCleanRLPolicy) -> tuple[Tensor, Tensor, Tensor]:
-    Tensor.no_grad = True
     action, logprob, _, value = agent(obs)
-    Tensor.no_grad = False
     return action, logprob, value
 
 @TinyJit
 def get_value(obs: Tensor, agent: TinyCleanRLPolicy) -> Tensor:
-    Tensor.no_grad = True
     value = agent.get_value(obs)
-    Tensor.no_grad = False
     return value
 
 @TinyJit
@@ -54,14 +50,13 @@ def train_step(
         )
 
     pg_loss1 = -mb_advantages * ratio
-    pg_loss2 = -mb_advantages * ratio.clamp(1 - args.clip_coef, 1 + args.clip_coef)
+    pg_loss2 = -mb_advantages * ratio.clip(1 - args.clip_coef, 1 + args.clip_coef)
     pg_loss = pg_loss1.maximum(pg_loss2).mean()
     # Value loss
     newvalue = newvalue.view(-1)
     if args.clip_vloss:
         value_diff = newvalue - returns[mb_inds]
         v_loss_unclipped = value_diff ** 2
-        
         v_clipped = values[mb_inds] + value_diff.clamp(
             -args.vf_clip_coef,
             args.vf_clip_coef,
@@ -73,12 +68,10 @@ def train_step(
         v_loss = 0.5 * ((newvalue - returns[mb_inds]) ** 2).mean()
 
     entropy_loss = entropy.mean()
-    loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
-
-    optimizer.zero_grad()
-    breakpoint()
-    loss.backward()
     
+    loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
+    optimizer.zero_grad()
+    loss.backward()
     # nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm) #TODO: come back to gradient clipping
     optimizer.step()
 
@@ -89,7 +82,7 @@ def train_step(
     clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
     Tensor.no_grad = False
 
-    return pg_loss, v_loss, entropy_loss, old_approx_kl, approx_kl
+    return pg_loss.realize(), v_loss.realize(), entropy_loss.realize(), old_approx_kl.realize(), approx_kl.realize()
 
 def main():
     args_dict, env_name = parse_args()
@@ -108,7 +101,6 @@ def main():
     args.num_steps = 1024      # n_steps from model_kwargs
     args.batch_size = 8        # batch_size from model_kwargs
     args.update_epochs = 5     # n_epochs from model_kwargs
-    args.num_envs = 1         # Single environment
     
     # These parameters match SB3 defaults: TODO: pass these args instead of hardcoding
     args.gamma = 0.99         # discount factor
@@ -140,7 +132,6 @@ def main():
     random.seed(args.seed)
     np.random.seed(args.seed)
     Tensor.manual_seed(args.seed)
-
 
     envs = gymnasium.vector.SyncVectorEnv(
         [
@@ -197,9 +188,9 @@ def main():
             # ALGO LOGIC: action logic
             Tensor.no_grad = True
             action, logprob, value = get_action_and_value(Tensor(next_obs, dtype=dtypes.float32), agent)
-            Tensor.no_grad = False
-            
             values.append(value.flatten().numpy())
+            Tensor.no_grad = False
+
             action_numpy = action.numpy()
             actions.append(action_numpy)
             logprobs.append(logprob.numpy())
@@ -223,8 +214,6 @@ def main():
 
         Tensor.no_grad = True
         next_value = get_value(Tensor(next_obs, dtype=dtypes.float32), agent).reshape(1, -1).numpy()
-        Tensor.no_grad = False # does this need to be here?
-        
         advantages = np.zeros_like(rewards)
         lastgaelam = 0
         dones_array = np.array(dones)
@@ -241,6 +230,7 @@ def main():
                 delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
             )
         returns = (advantages + values)
+        Tensor.no_grad = False # does this need to be here?
 
         # Stack tensors from lists
         obs_tensor = Tensor(np.array(obs), dtype=dtypes.float32)
@@ -270,10 +260,7 @@ def main():
                 pg_loss, v_loss, entropy_loss, old_approx_kl, approx_kl = train_step(
                     mb_inds, b_obs, b_actions, b_logprobs, b_advantages, b_returns, b_values, args, agent, optimizer, clipfracs
                 )
-                pg_loss, v_loss, entropy_loss, old_approx_kl, approx_kl = pg_loss.realize().item(), v_loss.realize().item(), entropy_loss.realize().item(), old_approx_kl.realize().item(), approx_kl.realize().item()
-                # print(f"inputs: {mb_inds}, b_obs: {b_obs.numpy()[mb_inds]}, b_actions: {b_actions.numpy()[mb_inds]}, b_logprobs: {b_logprobs.numpy()[mb_inds]}, b_advantages: {b_advantages.numpy()[mb_inds]}, b_returns: {b_returns.numpy()[mb_inds]}, b_values: {b_values.numpy()[mb_inds]}")
-                print(f"pg_loss: {pg_loss}, v_loss: {v_loss}, entropy_loss: {entropy_loss}, old_approx_kl: {old_approx_kl}, approx_kl: {approx_kl}")
-                # breakpoint()
+                pg_loss, v_loss, entropy_loss, old_approx_kl, approx_kl = pg_loss.item(), v_loss.item(), entropy_loss.item(), old_approx_kl.item(), approx_kl.item()
             if args.target_kl is not None and approx_kl > args.target_kl:
                 break
 
