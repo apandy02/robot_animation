@@ -21,6 +21,13 @@ def get_action_and_value(obs: Tensor, agent: TinyCleanRLPolicy) -> tuple[Tensor,
     return action, logprob, value
 
 @TinyJit
+def get_value(obs: Tensor, agent: TinyCleanRLPolicy) -> Tensor:
+    Tensor.no_grad = True
+    value = agent.get_value(obs)
+    Tensor.no_grad = False
+    return value
+
+@TinyJit
 @Tensor.train()
 def train_step(
     mb_inds: list[int],
@@ -35,6 +42,7 @@ def train_step(
     optimizer: nn.optim.Optimizer,
     clipfracs: list[float]
 ):
+
     _, newlogprob, entropy, newvalue = agent(obs[mb_inds], actions[mb_inds])
     logratio = newlogprob - logprobs[mb_inds]
     ratio = logratio.exp()
@@ -48,7 +56,6 @@ def train_step(
     pg_loss1 = -mb_advantages * ratio
     pg_loss2 = -mb_advantages * ratio.clamp(1 - args.clip_coef, 1 + args.clip_coef)
     pg_loss = pg_loss1.maximum(pg_loss2).mean()
-
     # Value loss
     newvalue = newvalue.view(-1)
     if args.clip_vloss:
@@ -69,7 +76,9 @@ def train_step(
     loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
 
     optimizer.zero_grad()
+    breakpoint()
     loss.backward()
+    
     # nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm) #TODO: come back to gradient clipping
     optimizer.step()
 
@@ -80,7 +89,7 @@ def train_step(
     clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
     Tensor.no_grad = False
 
-    return pg_loss.realize().item(), v_loss.realize().item(), entropy_loss.realize().item(), old_approx_kl.realize().item(), approx_kl.realize().item()
+    return pg_loss, v_loss, entropy_loss, old_approx_kl, approx_kl
 
 def main():
     args_dict, env_name = parse_args()
@@ -213,7 +222,9 @@ def main():
                         episode_stats["last30episode_return"] = info["last30episode_return"]
 
         Tensor.no_grad = True
-        next_value = (agent.get_value(Tensor(next_obs, dtype=dtypes.float32)).reshape(1, -1)).numpy()
+        next_value = get_value(Tensor(next_obs, dtype=dtypes.float32), agent).reshape(1, -1).numpy()
+        Tensor.no_grad = False # does this need to be here?
+        
         advantages = np.zeros_like(rewards)
         lastgaelam = 0
         dones_array = np.array(dones)
@@ -230,7 +241,6 @@ def main():
                 delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
             )
         returns = (advantages + values)
-        Tensor.no_grad = False # does this need to be here?
 
         # Stack tensors from lists
         obs_tensor = Tensor(np.array(obs), dtype=dtypes.float32)
@@ -260,6 +270,10 @@ def main():
                 pg_loss, v_loss, entropy_loss, old_approx_kl, approx_kl = train_step(
                     mb_inds, b_obs, b_actions, b_logprobs, b_advantages, b_returns, b_values, args, agent, optimizer, clipfracs
                 )
+                pg_loss, v_loss, entropy_loss, old_approx_kl, approx_kl = pg_loss.realize().item(), v_loss.realize().item(), entropy_loss.realize().item(), old_approx_kl.realize().item(), approx_kl.realize().item()
+                # print(f"inputs: {mb_inds}, b_obs: {b_obs.numpy()[mb_inds]}, b_actions: {b_actions.numpy()[mb_inds]}, b_logprobs: {b_logprobs.numpy()[mb_inds]}, b_advantages: {b_advantages.numpy()[mb_inds]}, b_returns: {b_returns.numpy()[mb_inds]}, b_values: {b_values.numpy()[mb_inds]}")
+                print(f"pg_loss: {pg_loss}, v_loss: {v_loss}, entropy_loss: {entropy_loss}, old_approx_kl: {old_approx_kl}, approx_kl: {approx_kl}")
+                # breakpoint()
             if args.target_kl is not None and approx_kl > args.target_kl:
                 break
 
@@ -275,12 +289,12 @@ def main():
                     "0verview/agent_steps": global_step,
                     "0verview/SPS": int(global_step / (time.time() - start_time)),
                     "0verview/epoch": iteration,
-                    "0verview/learning_rate": optimizer.param_groups[0]["lr"],
-                    "losses/value_loss": v_loss.item(),
-                    "losses/policy_loss": pg_loss.item(),
-                    "losses/entropy": entropy_loss.item(),
-                    "losses/old_approx_kl": old_approx_kl.item(),
-                    "losses/approx_kl": approx_kl.item(),
+                    "0verview/learning_rate": 3e-4,
+                    "losses/value_loss": v_loss,
+                    "losses/policy_loss": pg_loss,
+                    "losses/entropy": entropy_loss,
+                    "losses/old_approx_kl": old_approx_kl,
+                    "losses/approx_kl": approx_kl,
                     "losses/clipfrac": np.mean(clipfracs),
                     "losses/explained_variance": explained_var,
                     "environment/episode_return": np.mean(episode_stats["episode_return"]),

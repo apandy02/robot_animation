@@ -8,7 +8,7 @@ import tomllib
 import uuid
 
 import pufferlib
-import pufferlib.frameworks.cleanrl
+import pufferlib.cleanrl
 import pufferlib.utils
 import pufferlib.vector
 from rich.traceback import install
