@@ -34,7 +34,7 @@ robot_animation/
    ```bash
    pip install uv
    ```
-   or using wget:
+   or using wget (recommended):
    ```bash
    wget -qO- https://astral.sh/uv/install.sh | sh
    source $HOME/.local/bin/env
