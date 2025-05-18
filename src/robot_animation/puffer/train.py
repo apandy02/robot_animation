@@ -90,6 +90,7 @@ def parse_args(config=DEFAULT_CONFIG):
         "--repeat", type=int, default=1, help="Repeat the training with different seeds"
     )
     parser.add_argument("-d", "--device", type=str, default=None)
+    parser.add_argument("--save-model", action="store_true", help="Save model after training")
     # parser.add_argument("--capture-video", action="store_true", help="Capture videos")
 
     args = parser.parse_known_args()[0]
@@ -107,7 +108,7 @@ def parse_args(config=DEFAULT_CONFIG):
 
     # Override config with command line arguments
     parsed = parser.parse_args().__dict__
-    args = {"env": {}, "policy": {}, "rnn": {}}
+    args = {"env": {}, "policy": {}, "rnn": {}, "save_model": False}
     env_name = parsed.pop("env_name")
     for key, value in parsed.items():
         next = args

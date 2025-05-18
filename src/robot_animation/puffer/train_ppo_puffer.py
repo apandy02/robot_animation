@@ -58,6 +58,8 @@ if __name__ == "__main__":
     args.num_minibatches = args.minibatch_size
     args.num_iterations = args.total_timesteps // args.batch_size
 
+    args.save_model = args_dict["save_model"]
+
     wandb = None
     if args.track:
         wandb = init_wandb(args_dict, run_name)
